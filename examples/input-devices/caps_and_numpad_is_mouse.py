@@ -108,12 +108,8 @@ def event_sender_thread():
     mouse_x_delta = 1
     while keys_down or keys_released:
         if has_key("mouse", keys_down):
-            if has_key("mouse-fast", keys_down):
-                max_speed = 30
-                mouse_accel = max_speed
-            else:
-                max_speed = 5
-                mouse_accel = max_speed
+            max_speed = 30 if has_key("mouse-fast", keys_down) else 5
+            mouse_accel = max_speed
             if has_key("mouse-button-left", keys_down, clear=True):
                 mouse.press("BTN_LEFT")
             if has_key("mouse-button-left", keys_released, clear=True):
@@ -142,10 +138,8 @@ def event_sender_thread():
                 mouse_x_delta += mouse_accel
             else:
                 mouse_x_delta = 0
-            if mouse_x_delta > max_speed:
-                mouse_x_delta = max_speed
-            if mouse_y_delta > max_speed:
-                mouse_y_delta = max_speed
+            mouse_x_delta = min(mouse_x_delta, max_speed)
+            mouse_y_delta = min(mouse_y_delta, max_speed)
             if mouse_x_delta > 0 and mouse_y_delta > 0:
                 alpha = math.atan(mouse_y_delta / float(mouse_x_delta))
                 speed = min(max_speed, math.sqrt(mouse_x_delta**2 + mouse_y_delta**2))

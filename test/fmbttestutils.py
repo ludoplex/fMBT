@@ -55,14 +55,9 @@ def _pid_exists_on_windows(pid):
     hProc = ctypes.windll.kernel32.OpenProcess(
         PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if hProc == 0:
-        if ctypes.windll.kernel32.GetLastError() == 5:
-            # Access denied, process exists
-            return True
-        else:
-            return False
-    else:
-        ctypes.windll.kernel32.CloseHandle(hProc)
-        return True
+        return ctypes.windll.kernel32.GetLastError() == 5
+    ctypes.windll.kernel32.CloseHandle(hProc)
+    return True
 
 if __name__ == "__main__":
     opts, remainder = getopt.getopt(

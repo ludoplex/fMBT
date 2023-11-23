@@ -35,24 +35,20 @@ def _stdouterr(cmd):
         close_fds=True,
         env=env)
     out, err = p.communicate()
-    fmbt.adapterlog("<OUT>%s</OUT>" % (out + err,))
+    fmbt.adapterlog(f"<OUT>{out + err}</OUT>")
     return out + err
 
 def _pipe_reader(fileobj):
     l = True
     while l:
         l = fileobj.readline()
-        fmbt.adapterlog("<SERVER>%s</SERVER>" % (l.rstrip()))
+        fmbt.adapterlog(f"<SERVER>{l.rstrip()}</SERVER>")
 
 _g_server_proc = None
 def server_start(cmdline_args=[]):
     global _g_server_proc
     fmbt.adapterlog("server start")
-    port=os.getenv("RD_TEST_PORT", "")
-    if port:
-        port_options = ["-p", port]
-    else:
-        port_options = []
+    port_options = ["-p", port] if (port := os.getenv("RD_TEST_PORT", "")) else []
     _g_server_proc = subprocess.Popen(
         ["remotedevices-server"] + cmdline_args + ["--", "-d"] + port_options,
         stdin=subprocess.PIPE,
@@ -69,17 +65,21 @@ def ctl(cmdArgs=[], expected=[], not_expected=[]):
     _retval = []
     for regexp in expected:
         match = re.search(regexp, _out)
-        assert re.search(regexp, _out), '"%s" not in <STDOUTERR>%s</STDOUTERR>' % (regexp, _out)
+        assert re.search(
+            regexp, _out
+        ), f'"{regexp}" not in <STDOUTERR>{_out}</STDOUTERR>'
         _retval.append(match.group(0))
 
     for regexp in not_expected:
-        assert re.search(regexp, _out) == None, '"%s" in <STDOUTERR>%s</STDOUTERR>' % (regexp, _out)
+        assert (
+            re.search(regexp, _out) is None
+        ), f'"{regexp}" in <STDOUTERR>{_out}</STDOUTERR>'
     return _retval
 
 def ctl_acquire(matchArgs=[], expected=[]):
     _out = _stdouterr(["remotedevices-ctl", "acquire"] + matchArgs)
     for regexp in expected:
-        assert re.match(regexp, _out), '"%s" does not match "%s"' % (regexp, _out)
+        assert re.match(regexp, _out), f'"{regexp}" does not match "{_out}"'
 
 def server_terminate():
     fmbt.adapterlog("server terminate")

@@ -155,7 +155,7 @@ class Connection(object):
         an exception in remote end, respectively.
 
         """
-        if namespace == None:
+        if namespace is None:
             namespace = self.namespace()
         pythonshare._check_hook("before:client.exec_in", {"code": code, "expr": expr, "namespace": namespace, "async": async, "lock": lock})
         try:
@@ -165,12 +165,10 @@ class Connection(object):
             response = pythonshare._recv_with_info(self._from_server)
             obj = self.make_local(response)
             if isinstance(obj, Auth_rv) and obj.success == False:
-                raise pythonshare.PythonShareError('Authentication failed: %s'
-                                                   % (obj.errormsg,))
+                raise pythonshare.PythonShareError(f'Authentication failed: {obj.errormsg}')
             return obj
         except EOFError:
-            raise pythonshare.PythonShareError(
-                'No connection to namespace "%s"' % (namespace,))
+            raise pythonshare.PythonShareError(f'No connection to namespace "{namespace}"')
 
     def eval_(self, expr, **kwargs):
         """Evaluate expr in the default namespace.
@@ -222,8 +220,7 @@ class Connection(object):
         """
         if isinstance(async_rv, str):
             async_rv = eval(async_rv)
-        rv = self.eval_in(async_rv.ns, "pythonshare_ns.read_rv(%s)" % (async_rv,))
-        return rv
+        return self.eval_in(async_rv.ns, f"pythonshare_ns.read_rv({async_rv})")
 
     def export_ns(self, namespace):
         """Export namespace to remote peer
@@ -318,7 +315,7 @@ class Connection(object):
 
     def kill_server(self, namespace=None):
         """Send server shutdown message"""
-        if namespace == None:
+        if namespace is None:
             namespace = self.namespace()
         pythonshare._send(Server_ctl("die", namespace), self._to_server)
         return True
@@ -332,7 +329,7 @@ class Connection(object):
         return self.eval_("pythonshare_ns.remote_nss(%r)" % (kwargs,))
 
     def ns_type(self, ns):
-        return self.eval_("pythonshare_ns.ns_type(%s)" % (repr(ns),))
+        return self.eval_(f"pythonshare_ns.ns_type({repr(ns)})")
 
     def namespace(self):
         """Return default namespace"""

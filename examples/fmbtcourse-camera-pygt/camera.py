@@ -14,15 +14,11 @@ def capture(params):
 
 def startPreview(params):
     global g_capturedPreviewFrames
-    if g_capturingVideo:
-        g_capturedPreviewFrames += 15
-    else:
-        g_capturedPreviewFrames += 25
+    g_capturedPreviewFrames += 15 if g_capturingVideo else 25
 
 def stopPreview():
     global g_capturedPreviewFrames
     g_capturedPreviewFrames = 0
-    pass
 
 def previewing():
     return g_capturedPreviewFrames != 0

@@ -253,7 +253,7 @@ def _deleteTrailingWhitespace(multilineString):
 def _parseIncludedFiles(string, includePath=(), alreadyFound=()):
     found = []
     not_found = []
-    already_found = set([os.path.basename(f) for f in alreadyFound])
+    already_found = {os.path.basename(f) for f in alreadyFound}
     for filename in PP_INCLUDEFILE.findall(string):
         if os.path.basename(filename) in already_found:
             continue
@@ -315,10 +315,16 @@ class MyScaleEvents(QtCore.QObject):
                     for d in path.split(':'):
                         filepath = os.path.join(d, filename)
                         if os.access(filepath, os.R_OK):
-                            QtGui.QToolTip.showText(event.globalPos(), '%s<br><img src="%s">' % (filepath, filepath))
+                            QtGui.QToolTip.showText(
+                                event.globalPos(),
+                                f'{filepath}<br><img src="{filepath}">',
+                            )
                             break
                     else:
-                        QtGui.QToolTip.showText(event.globalPos(), '%s<br>not in found in<br># preview-image-path:...' % (filename,))
+                        QtGui.QToolTip.showText(
+                            event.globalPos(),
+                            f'{filename}<br>not in found in<br># preview-image-path:...',
+                        )
                     self.visibleTip = (lineno, quotedString)
             else:
                 self.visibleTip = None
@@ -337,15 +343,17 @@ def asyncRuncmd(cmd, onThreadSuccess=lambda: None, onSuccess=lambda: None, onErr
     thread, onSuccess and onError functions in the main
     thread. Successful executions are commands with exit status 0 and
     function calls that do not raise exceptions."""
+
+
     class Async(QtCore.QThread):
         def run(self):
-            if type(cmd) == str or type(cmd) == tuple:
+            if type(cmd) in [str, tuple]:
                 if type(cmd) == str:
                     useShell = True
                     sys.stdout.write(cmd)
                 else:
                     useShell = False
-                    sys.stdout.write("%s '%s'" % (cmd[0], "' '".join(cmd[1:])))
+                    sys.stdout.write(f"""{cmd[0]} '{"' '".join(cmd[1:])}'""")
                 sys.stdout.flush()
                 p = subprocess.Popen(cmd, shell=useShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 output = p.stderr.read() + p.stdout.read()
@@ -367,9 +375,11 @@ def asyncRuncmd(cmd, onThreadSuccess=lambda: None, onSuccess=lambda: None, onErr
                     self.emit(Async.signal_success)
                 else:
                     self.emit(Async.signal_error)
+
         signal_success = QtCore.SIGNAL("success()")
         signal_error = QtCore.SIGNAL("error()")
         signal_finished = QtCore.SIGNAL("finished()")
+
 
     def cleanup():
         # At the time of calling cleanup, onSuccess and onError
@@ -378,6 +388,7 @@ def asyncRuncmd(cmd, onThreadSuccess=lambda: None, onSuccess=lambda: None, onErr
         # too early.
         asyncRuncmd.finished[cmd] = asyncRuncmd.running[cmd]
         del asyncRuncmd.running[cmd]
+
     if type(cmd) == list: cmd = tuple(cmd)
     if cmd in asyncRuncmd.running: return "Command already running"
     async = Async()
@@ -632,12 +643,8 @@ Keyboard shortcuts:<br>
         path = QtGui.QFileDialog.getSaveFileName(self, dialogTitle, '',
                                                  ";;".join([fileFormats[n] for n in fileFormatFilters]))
 
-        if not_using_PySide:
-            newName = path
-        else:
-            newName = path[0]
-
-        if str(newName) == "":
+        newName = path if not_using_PySide else path[0]
+        if not str(newName):
             return
 
         if self.edit.currentIndex() == EDITTAB_GT:
@@ -659,11 +666,10 @@ Keyboard shortcuts:<br>
                 dialog.setNameFilters(["fMBT AAL models (*.aal)", "fMBT GT commands (*.gt)", "State machines (*.lsts)"])
                 if self._fileDialogFilter:
                     dialog.selectNameFilter(self._fileDialogFilter)
-                dialog.exec_()
             else:
                 dialog.setWindowTitle("Open configuration")
                 dialog.setNameFilters(["fMBT test configuration (*.conf)"])
-                dialog.exec_()
+            dialog.exec_()
             if not dialog.result():
                 return
             path = str(dialog.selectedFiles()[0])
@@ -680,12 +686,12 @@ Keyboard shortcuts:<br>
                     self._confFileName = None
                     self._doGenerateConf()
                 self._set_modelFileName(path)
-                self.refreshImages()
             else:
                 self.conf_editor.setPlainText(uFile(path).read())
                 self.conf_editor.setFocus()
                 self._set_confFileName(path)
-                self.refreshImages()
+
+            self.refreshImages()
 
     def runcmd(self, cmd, env=None):
         print cmd
@@ -710,8 +716,7 @@ Keyboard shortcuts:<br>
         return self._modelFileName.endswith(".aal")
 
     def _editingAALCPP(self):
-        lang = GT_LANGUAGE.findall(self._modelSources())
-        if lang:
+        if lang := GT_LANGUAGE.findall(self._modelSources()):
             if lang[0] in _cpp_sources:
                 return True
 
@@ -727,11 +732,7 @@ Keyboard shortcuts:<br>
         return ret
 
     def _AALNAME(self):
-        names = GT_AALNAME.findall(self._modelSources())
-        if names:
-            return names[0]
-
-        return ""
+        return names[0] if (names := GT_AALNAME.findall(self._modelSources())) else ""
 
     def _editingGT(self):
         return not self._editingLSTS() and not self._editingAAL()
@@ -783,16 +784,19 @@ Keyboard shortcuts:<br>
         if "fmbt-aalc: parsing AAL failed" in errorMsg:
             for filename, lineno, whatswrong in re.findall("^(.+):([0-9]+):(.*error.*)", errorMsg):
                 if filename == self._modelFileName or filename in self._modelEditorFiles:
-                    self.preview_error.insertHtml('<table><tr><td style="color: darkred;">AAL error in file <a href="%s:%s">%s</a>, line %s</td></tr>' %
-                                                  (urllib.quote(filename), lineno, filename, lineno))
+                    self.preview_error.insertHtml(
+                        f'<table><tr><td style="color: darkred;">AAL error in file <a href="{urllib.quote(filename)}:{lineno}">{filename}</a>, line {lineno}</td></tr>'
+                    )
                 else:
-                    self.preview_error.insertHtml('<table><tr><td style="color: darkred;">AAL error in file %s, line %s</td></tr>' %
-                                                  (filename, lineno))
-                self.preview_error.insertHtml('<tr><td style="padding-left: 40 px;">%s</td></tr></table>' % (whatswrong,))
+                    self.preview_error.insertHtml(
+                        f'<table><tr><td style="color: darkred;">AAL error in file {filename}, line {lineno}</td></tr>'
+                    )
+                self.preview_error.insertHtml(
+                    f'<tr><td style="padding-left: 40 px;">{whatswrong}</td></tr></table>'
+                )
         elif "Traceback (most recent call last):" in errorMsg:
             for l in self._modelSource().splitlines():
-                if l.strip().startswith("language") and not (
-                    "py" in l.lower()):
+                if l.strip().startswith("language") and "py" not in l.lower():
                     if "c++" in l.lower():
                         self.preview_error.insertHtml("AAL/C++ cannot be previewed.<br><br>")
                     self.preview_error.insertHtml("fmbt-editor preview supports only AAL/Python and GT languages.<br>")
@@ -805,21 +809,28 @@ Keyboard shortcuts:<br>
             except:
                 exceptionString = "Python error."
             inUserCode = True
-            self.preview_error.insertHtml('<table><tr><td style="color: darkred;">%s<br>Traceback (most recent call last)</td></tr>' % (exceptionString,))
+            self.preview_error.insertHtml(
+                f'<table><tr><td style="color: darkred;">{exceptionString}<br>Traceback (most recent call last)</td></tr>'
+            )
             for filename, lineno, _, location, lineofcode in re.findall('  File "([^"]+)", line ([0-9]+)(, in (.*))?\n(.*)\n', errorMsg):
                 if filename.endswith('remote_pyaal') or filename.endswith('aalmodel.py'):
                     inUserCode = False
                 if inUserCode:
                     if filename == self._modelFileName or filename in self._modelEditorFiles:
-                        self.preview_error.insertHtml('<tr><td style="color:darkred;">File <a href="%s:%s">%s</a>, line %s, in %s</td></tr>' %
-                                                      (urllib.quote(filename), lineno, filename, lineno, location))
+                        self.preview_error.insertHtml(
+                            f'<tr><td style="color:darkred;">File <a href="{urllib.quote(filename)}:{lineno}">{filename}</a>, line {lineno}, in {location}</td></tr>'
+                        )
                     elif filename.startswith("/tmp/remote"):
-                        self.preview_error.insertHtml('<tr><td style="color:darkred;">in %s</td></tr>' %
-                                                      (location,))
+                        self.preview_error.insertHtml(
+                            f'<tr><td style="color:darkred;">in {location}</td></tr>'
+                        )
                     else:
-                        self.preview_error.insertHtml('<tr><td style="color:darkred;">File %s, line %s, in %s</td></tr>' %
-                                                      (filename, lineno, location))
-                    self.preview_error.insertHtml('<tr><td style="padding-left:40">%s</td></tr>' % (lineofcode,))
+                        self.preview_error.insertHtml(
+                            f'<tr><td style="color:darkred;">File {filename}, line {lineno}, in {location}</td></tr>'
+                        )
+                    self.preview_error.insertHtml(
+                        f'<tr><td style="padding-left:40">{lineofcode}</td></tr>'
+                    )
                 # the next step will be user code, could be an included file.
                 if filename.endswith("aalmodel.py") and location == "call":
                     inUserCode = True
@@ -831,9 +842,12 @@ Keyboard shortcuts:<br>
                 (filename, lineno, whatswrong) = re.findall("([^:]+):([0-9]+) syntax error in (.*)", errorMsg)[0]
             except: lineno = None
             if lineno:
-                self.preview_error.insertHtml('<table><tr><td style="color: darkred;">GT syntax error in file <a href="%s:%s">%s</a>, line %s</td></tr>' %
-                                              (urllib.quote(filename), lineno, filename, lineno))
-                self.preview_error.insertHtml('<tr><td style="padding-left: 40 px;">%s</td></tr></table>' % (whatswrong,))
+                self.preview_error.insertHtml(
+                    f'<table><tr><td style="color: darkred;">GT syntax error in file <a href="{urllib.quote(filename)}:{lineno}">{filename}</a>, line {lineno}</td></tr>'
+                )
+                self.preview_error.insertHtml(
+                    f'<tr><td style="padding-left: 40 px;">{whatswrong}</td></tr></table>'
+                )
         elif "fmbt: Creating" in errorMsg:
             try:
                 (module, whatswrong) = re.findall('fmbt: Creating ([^"]+)"([^"]+)" failed.', errorMsg)[0]
@@ -841,15 +855,15 @@ Keyboard shortcuts:<br>
             except: module=None
             if module != None:
                 filename = self._confFileName
-                if module == "end condition":
-                    lookfor_module = "" # "module in line" when looking for lineno
-                else:
-                    lookfor_module = module
+                lookfor_module = "" if module == "end condition" else module
                 lineno = [(lineindex+1, line) for lineindex, line in enumerate(file(self._confFileName))
                           if whatswrong in line and lookfor_module in line and not line.lstrip().startswith("#")][0][0]
-                self.preview_error.insertHtml('<table><tr><td style="color: darkred;">%s error in file <a href="%s:%s">%s</a>, line %s</td></tr>' %
-                                              (module, urllib.quote(filename), lineno, filename, lineno))
-                self.preview_error.insertHtml('<tr><td style="padding-left: 40 px;">%s</td></tr></table>' % (whatswrong,))
+                self.preview_error.insertHtml(
+                    f'<table><tr><td style="color: darkred;">{module} error in file <a href="{urllib.quote(filename)}:{lineno}">{filename}</a>, line {lineno}</td></tr>'
+                )
+                self.preview_error.insertHtml(
+                    f'<tr><td style="padding-left: 40 px;">{whatswrong}</td></tr></table>'
+                )
         self.preview_error.insertPlainText("\n\nComplete unformatted error output:\n%s" % (errorMsg,))
         self.preview_error.moveCursor(QtGui.QTextCursor.Start)
         self._previewTabBeforeError = self.preview.currentIndex()
@@ -874,14 +888,14 @@ Keyboard shortcuts:<br>
             self.conf_editor.setFocus()
 
     def _remote_pyaalCmdlineArgs(self, conf_lines=None):
-        if conf_lines == None:
+        if conf_lines is None:
             conf_lines = unicode(self.conf_editor.toPlainText()).split('\n')
         aal_ppflags = []
         aal_modelflags = ""
         for l in conf_lines:
             if "model" in l and not l.strip().startswith("#"):
-                aal_ppflags.extend(["-D%s" % f for f in re.findall('-D ?([^ ]*)', l)])
-                aal_ppflags.extend(["-I%s" % f for f in re.findall('-I ?([^ ]*)', l)])
+                aal_ppflags.extend([f"-D{f}" for f in re.findall('-D ?([^ ]*)', l)])
+                aal_ppflags.extend([f"-I{f}" for f in re.findall('-I ?([^ ]*)', l)])
                 try:
                     _cmd_line = l.split('(',1)[1].rsplit(')',1)[0]
                     aal_modelflags = shlex.split(_cmd_line)
@@ -899,10 +913,7 @@ Keyboard shortcuts:<br>
         aal2tag_cmd = aalc_command + [self._modelFileName, "-l", "tag"]
         tags_exitstatus, tags_output = self.runcmd(aal2tag_cmd)
         if tags_exitstatus == 0:
-            model_tags = []
-            for tag in tags_output[0].split('\n'):
-                if tag:
-                    model_tags.append(tag)
+            model_tags = [tag for tag in tags_output[0].split('\n') if tag]
 
     def _saveandvalidate_cpp(self):
         self._aalcFileName = _g_tempdir + os.sep + self._AALNAME() + ".so"
@@ -913,16 +924,20 @@ Keyboard shortcuts:<br>
         status, output = self.runcmd(aal2lib_cmd)
         if status == 0:
             [show_vars, hide_vars], preview_depth, _, _, _, _, _, _, collapse = self.aalPreviewArguments()
-            aal2lsts_cmd = ["remote_aal_loader","lib("+self._AALNAME()+","+ self._aalcFileName+")",str(preview_depth)]
+            aal2lsts_cmd = [
+                "remote_aal_loader",
+                f"lib({self._AALNAME()},{self._aalcFileName})",
+                str(preview_depth),
+            ]
             stat,(out,err) = self.runcmd(aal2lsts_cmd,{ "LD_LIBRARY_PATH" : _g_tempdir } )
             if stat == 0:
                 file(self._lstsFileName,"w").write(out)
                 return 0
             else:
-                self.showError("remote_aal_loader failure: %s:%s" % (out,err) )
+                self.showError(f"remote_aal_loader failure: {out}:{err}")
                 return 1
         else:
-            self.showError("compiler error: %s" % output)
+            self.showError(f"compiler error: {output}")
             return 1
 
     def _saveandvalidate_py(self):
@@ -940,10 +955,7 @@ Keyboard shortcuts:<br>
             aal2tag_cmd = ["fmbt-aalc"] + aal_ppflags + [self._modelFileName, "-l", "tag"]
             tags_exitstatus, tags_output = self.runcmd(aal2tag_cmd)
             if tags_exitstatus == 0:
-                model_tags = []
-                for tag in tags_output[0].split('\n'):
-                    if tag:
-                        model_tags.append(tag)
+                model_tags = [tag for tag in tags_output[0].split('\n') if tag]
                 show_hide_args = []
                 collapse = []
                 [show_vars, hide_vars], preview_depth, _, _, _, _, _, _, collapse = self.aalPreviewArguments()
@@ -969,7 +981,7 @@ Keyboard shortcuts:<br>
                 py2lsts_cmd = []
                 if self._menuOptionCFFD.isChecked():
                     # This CFFD-minimizing pipe does not work in Windows
-                    py2lsts_cmd = "remote_pyaal -o - %s %s --lsts-depth %s '%s'|tvt.CFFD_normalize - -|fmbt-gt -i - -o '%s'" % (aal_ppflags, show_hide_args, preview_depth, self._aalcFileName, self._lstsFileName)
+                    py2lsts_cmd = f"remote_pyaal -o - {aal_ppflags} {show_hide_args} --lsts-depth {preview_depth} '{self._aalcFileName}'|tvt.CFFD_normalize - -|fmbt-gt -i - -o '{self._lstsFileName}'"
                 else:
                     # py2lsts_cmd = "remote_pyaal %s -o '%s'%s --lsts-depth %s '%s'" % (aal_ppflags, self._lstsFileName, show_hide_args, preview_depth, self._aalcFileName)
                     py2lsts_cmd = ["remote_pyaal"] + aal_ppflags + ["-o", self._lstsFileName] + show_hide_args + ["--lsts-depth", str(preview_depth), self._aalcFileName]
@@ -986,7 +998,7 @@ Keyboard shortcuts:<br>
         if self._modelSpec().startswith("lsts_remote"):
             try: gt2lsts_cmd = re.findall("lsts_remote[ ]*\((.*)\)", self._modelSpec())[0]
             except: gt2lsts_cmd = ""
-        if gt2lsts_cmd == "":
+        if not gt2lsts_cmd:
             gt2lsts_cmd = ["fmbt-gt", "-f", self._modelFileName, "-o", self._lstsFileName]
         executed_program = gt2lsts_cmd
         validation_exitstatus, output = self.runcmd(gt2lsts_cmd)
@@ -1019,53 +1031,66 @@ Keyboard shortcuts:<br>
             self.edit.setTabIcon(0, QtGui.QIcon())
             self._model_ok = True
         elif validation_exitstatus == 127:
-            error('Cannot execute "%s". Check your fMBT installation or PATH.' % (executed_program,), gui=1)
+            error(
+                f'Cannot execute "{executed_program}". Check your fMBT installation or PATH.',
+                gui=1,
+            )
         else:
             self.edit.setTabIcon(0, QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MessageBoxWarning))
             self._model_ok = False
         conf_contents = unicode(self.conf_editor.toPlainText()).strip()
         if conf_contents == "" or not self._confFileName:
             self._doGenerateConf()
-        else:
-            if not self._previewOnlyMode:
-                uFile(self._confFileName, "w").write(
-                    _deleteTrailingWhitespace(conf_contents))
+        elif not self._previewOnlyMode:
+            uFile(self._confFileName, "w").write(
+                _deleteTrailingWhitespace(conf_contents))
         return self._model_ok
 
     def pixmapLoader(self, previewtab, filename):
         # previewtab is one of 'model', 'dist', 'cov'
         # returns function that can load an image in non-UI thread
         def loader():
-            qimage_attr = 'preview_%sqimage' % (previewtab,)
+            qimage_attr = f'preview_{previewtab}qimage'
             if not hasattr(self, qimage_attr):
                 setattr(self, qimage_attr, QtGui.QImage())
             getattr(self, qimage_attr).load(filename)
+
         return loader
 
     def pixmapViewer(self, previewtab):
         # returns function that presents an image in a qlabel
         # must be run in UI thread
-        self.preview.setTabIcon(eval("PREVIEWTAB_%s" % (previewtab.upper(),)),
-                                QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_BrowserReload))
+        self.preview.setTabIcon(
+            eval(f"PREVIEWTAB_{previewtab.upper()}"),
+            QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_BrowserReload),
+        )
         def viewer():
             # for instance, with 'model' this calls:
             # self.preview_modelimage.setPixmap(fromImage(self.preview_modelqimage))
             # self.preview_modelcont.area.setWidget(self.preview_modelimage)
             # self.preview_modelcont.area.wheel_scale_changed()
             # self.preview.setTabIcon(PREVIEWTAB_MODEL, QtGui.QIcon())
-            getattr(self, 'preview_%simage' % (previewtab,)).setPixmap(
-                QtGui.QPixmap.fromImage(getattr(self, 'preview_%sqimage' % (previewtab,))))
-            container = getattr(self, 'preview_%scont' % (previewtab,))
-            container.area.setWidget(getattr(self, 'preview_%simage' % (previewtab,)))
+            getattr(self, f'preview_{previewtab}image').setPixmap(
+                QtGui.QPixmap.fromImage(
+                    getattr(self, f'preview_{previewtab}qimage')
+                )
+            )
+            container = getattr(self, f'preview_{previewtab}cont')
+            container.area.setWidget(getattr(self, f'preview_{previewtab}image'))
             container.area.wheel_scale_changed()
-            self.preview.setTabIcon(eval("PREVIEWTAB_%s" % (previewtab.upper(),)),
-                                    QtGui.QIcon())
+            self.preview.setTabIcon(
+                eval(f"PREVIEWTAB_{previewtab.upper()}"), QtGui.QIcon()
+            )
+
         return viewer
 
     def pixmapUnviewable(self, previewtab):
         def errorhandler():
-            self.preview.setTabIcon(eval("PREVIEWTAB_%s" % (previewtab.upper(),)),
-                                    QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MessageBoxWarning))
+            self.preview.setTabIcon(
+                eval(f"PREVIEWTAB_{previewtab.upper()}"),
+                QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_MessageBoxWarning),
+            )
+
         return errorhandler
 
     def visualiseModel(self, change_tab = True):
@@ -1163,21 +1188,22 @@ Keyboard shortcuts:<br>
 
     def _generateModelSpec(self):
         if self._editingLSTS():
-            modelspec="lsts(%s)" % (self._lstsFileName,)
+            return f"lsts({self._lstsFileName})"
         elif self._editingAAL():
-            if self._editingAALCPP():
-                modelspec='lib('+self._AALNAME()+")"
-            else:
-                modelspec='aal_remote(remote_pyaal -l "%s.log" "%s")' % (
-                    (self._modelFileName, self._modelFileName))
+            return (
+                f'lib({self._AALNAME()})'
+                if self._editingAALCPP()
+                else f'aal_remote(remote_pyaal -l "{self._modelFileName}.log" "{self._modelFileName}")'
+            )
         else:
-            modelspec='lsts_remote(fmbt-gt -f "%s")' % (self._modelFileName,)
-        return modelspec
+            return f'lsts_remote(fmbt-gt -f "{self._modelFileName}")'
 
     def _generateAdapterSpec(self):
-        if self._editingAAL(): adapterspec = 'adapter   = aal'
-        else: adapterspec = '# adapter = "define your adapter here"'
-        return adapterspec
+        return (
+            'adapter   = aal'
+            if self._editingAAL()
+            else '# adapter = "define your adapter here"'
+        )
 
     def _modelSpec(self):
         try:
@@ -1250,10 +1276,9 @@ on_inconc = exit(2)
         if self._model_ok and self._test_ok:
             lines = self.readTestLogFromFile(self._logFileName)
             self.preview_test.setPlainText(''.join(lines))
-        else:
-            if hasattr(self, "_test_errormsg"):
-                self.showError(self._test_errormsg)
-                del self._test_errormsg
+        elif hasattr(self, "_test_errormsg"):
+            self.showError(self._test_errormsg)
+            del self._test_errormsg
 
         if change_tab:
             self.preview.setCurrentIndex(PREVIEWTAB_TEST)
@@ -1289,12 +1314,12 @@ on_inconc = exit(2)
     def liveUpdatePreviewTest(self):
         if self._fMBTRunning:
             lines = self.readTestLogFromFile(self._logFileName)
-            if self._fMBTRunning:
-                self.preview_test.setPlainText(''.join(lines))
-                self.preview_test.moveCursor(QtGui.QTextCursor.End)
-                # continue updating
-                QtCore.QTimer.singleShot(1000, window.liveUpdatePreviewTest)
-                return
+        if self._fMBTRunning:
+            self.preview_test.setPlainText(''.join(lines))
+            self.preview_test.moveCursor(QtGui.QTextCursor.End)
+            # continue updating
+            QtCore.QTimer.singleShot(1000, window.liveUpdatePreviewTest)
+            return
         # do not update anymore
         self.preview.setTabIcon(PREVIEWTAB_TEST, QtGui.QIcon())
 
@@ -1492,16 +1517,16 @@ on_inconc = exit(2)
             return None
 
     def cutInActiveEditor(self):
-        editor = self.activeEditor()
-        if editor: editor.cut()
+        if editor := self.activeEditor():
+            editor.cut()
 
     def copyInActiveEditor(self):
-        editor = self.activeEditor()
-        if editor: editor.copy()
+        if editor := self.activeEditor():
+            editor.copy()
 
     def pasteInActiveEditor(self):
-        editor = self.activeEditor()
-        if editor: editor.paste()
+        if editor := self.activeEditor():
+            editor.paste()
 
     def zoomIn(self):
         scalable = self.activeEditor()
@@ -1518,11 +1543,8 @@ on_inconc = exit(2)
             scalable._scaleevents.changeScale(0.9)
 
     def updateModelTabText(self):
-        if len(self._relatedModelFiles()) > 1: extra = " (more) "
-        else: extra = ""
-        tabText = "%s:%s%s - F1" % (os.path.basename(self._modelEditorActiveFile),
-                                    self.editor.textCursor().blockNumber() + 1,
-                                    extra)
+        extra = " (more) " if len(self._relatedModelFiles()) > 1 else ""
+        tabText = f"{os.path.basename(self._modelEditorActiveFile)}:{self.editor.textCursor().blockNumber() + 1}{extra} - F1"
         self.edit.setTabText(EDITTAB_GT, tabText)
 
     def updateConfTabText(self):
@@ -1530,19 +1552,22 @@ on_inconc = exit(2)
             captionFile = "Configuration"
         else:
             captionFile = os.path.basename(self._confFileName)
-        self.edit.setTabText(EDITTAB_CONF,"%s:%s - F2" %
-                             (os.path.basename(captionFile),
-                              self.conf_editor.textCursor().blockNumber() + 1))
+        self.edit.setTabText(
+            EDITTAB_CONF,
+            f"{os.path.basename(captionFile)}:{self.conf_editor.textCursor().blockNumber() + 1} - F2",
+        )
 
     def updateModelInConfFile(self):
         newLines = []
         confLines = unicode(self.conf_editor.toPlainText()).split('\n')
         for line in confLines:
             if line.startswith('model'):
-                newLines.append('model     = %s' % (self._generateModelSpec(),))
-            elif (line.startswith('# adapter = "define your adapter here"') and
-                  [l for l in confLines if l.startswith('adapter')] == []) or (
-                line.startswith('adapter   = aal')):
+                newLines.append(f'model     = {self._generateModelSpec()}')
+            elif (
+                line.startswith('# adapter = "define your adapter here"')
+                and not [l for l in confLines if l.startswith('adapter')]
+                or (line.startswith('adapter   = aal'))
+            ):
                 newLines.append(self._generateAdapterSpec())
             else:
                 newLines.append(line)
@@ -1556,7 +1581,7 @@ on_inconc = exit(2)
         cursor.setCharFormat(cf)
 
     def find(self, findFlagsDontCare, replaceMode=False):
-        if self._findDialog == None:
+        if self._findDialog is None:
             self._findDialog = FindDialog(self, QtCore.Qt.WindowType.Dialog)
         if self._findDialog.isVisible():
             self._findDialog.findNext()
@@ -1576,8 +1601,7 @@ on_inconc = exit(2)
         if text == "":
             self.findHitCounter.setText("Hits: -")
         else:
-            self.findHitCounter.setText("Hits: %s" % (
-                    self.findFromPlainText.count(text)))
+            self.findHitCounter.setText(f"Hits: {self.findFromPlainText.count(text)}")
         self.findCanReplace = None
 
     def editTabChanged(self, tabIndex):
@@ -1866,14 +1890,14 @@ on_inconc = exit(2)
             menu.addAction(filename, lambda: None)
         m = menu.exec_(self.editor.mapToGlobal(QtCore.QPoint(0,0)))
 
-        if m == None or m.text() == self._modelEditorActiveFile:
+        if m is None or m.text() == self._modelEditorActiveFile:
             return
         self.switchToModelEditorFile(m.text())
 
     def switchToModelEditorFile(self, newActiveFile):
         self.storeModelEditorActiveFile()
 
-        if not newActiveFile in self._modelEditorFiles:
+        if newActiveFile not in self._modelEditorFiles:
             try:
                 self._modelEditorFiles[newActiveFile] = (1, uFile(newActiveFile).read())
             except:
@@ -1924,6 +1948,7 @@ on_inconc = exit(2)
                     snames.append(m_state)
                     tnames.append(m_tag)
             return snames, anames, tnames
+
         def cursorForReplacingFromStartOfLine():
             c = self.editor.textCursor()
             c.clearSelection()
@@ -1934,31 +1959,37 @@ on_inconc = exit(2)
         pos = self.editor.textCursor().position()
         if self._iterate_index == 0:
             _, self._anames, self._tnames = stateActionTagNames(pt)
-            self._anames = list(set(self._anames))
-            self._anames.sort()
-            self._tnames = list(set(self._tnames))
-            self._tnames.sort()
+            self._anames = sorted(set(self._anames))
+            self._tnames = sorted(set(self._tnames))
             states_above, _, _ = stateActionTagNames(pt[:pos])
             states_below, _, _ = stateActionTagNames(pt[pos:])
             states_above.reverse()
             states = states_above[:5] + states_below[:7] + states_above[5:] + states_below[7:]
             unused_states = set(states)
-            uniq_states = [s for s in states
-                           if s in unused_states and unused_states.remove(s) == None]
+            uniq_states = [
+                s
+                for s in states
+                if s in unused_states and unused_states.remove(s) is None
+            ]
             if not uniq_states:
                 self._iterate_index = -1
                 return
             self._statenames = uniq_states
         curr_line = pt[:pos].split('\n')[-1]
-        if curr_line.strip() == "" or (curr_line.strip().startswith("T") and not ',' in curr_line):
+        if (
+            curr_line.strip() == ""
+            or curr_line.strip().startswith("T")
+            and ',' not in curr_line
+        ):
             # Guess source state for T(X
             if not self._statenames:
                 self._iterate_index = -1
                 return
-            if "T" in curr_line: prefix = curr_line[:curr_line.index('T')]
-            else: prefix = curr_line
+            prefix = curr_line[:curr_line.index('T')] if "T" in curr_line else curr_line
             c = cursorForReplacingFromStartOfLine()
-            c.insertText("%sT(%s" % (prefix, self._statenames[self._iterate_index % len(self._statenames)],))
+            c.insertText(
+                f"{prefix}T({self._statenames[self._iterate_index % len(self._statenames)]}"
+            )
         elif curr_line.startswith("T") and curr_line.count(",") == 2 and ")" not in curr_line[curr_line.rindex(",")+1:]:
             # Guess destination state for T(..., ..., X
             if not self._statenames:
@@ -1966,7 +1997,9 @@ on_inconc = exit(2)
                 return
             prefix = curr_line[:curr_line.rindex(",")+1]
             c = cursorForReplacingFromStartOfLine()
-            c.insertText("%s %s" % (prefix, self._statenames[self._iterate_index % len(self._statenames)],))
+            c.insertText(
+                f"{prefix} {self._statenames[self._iterate_index % len(self._statenames)]}"
+            )
         elif curr_line.startswith("T") and curr_line.count(",") == 1:
             # Guess action for T(..., X
             if not self._anames:
@@ -1974,22 +2007,32 @@ on_inconc = exit(2)
                 return
             prefix = curr_line[:curr_line.rindex(",")+1]
             c = cursorForReplacingFromStartOfLine()
-            c.insertText("%s %s" % (prefix, self._anames[self._iterate_index % len(self._anames)],))
-        elif (curr_line.startswith("P") and not ',' in curr_line):
+            c.insertText(
+                f"{prefix} {self._anames[self._iterate_index % len(self._anames)]}"
+            )
+        elif curr_line.startswith("P") and ',' not in curr_line:
             # Guess state for P(X
             if not self._statenames:
                 self._iterate_index = -1
                 return
             c = cursorForReplacingFromStartOfLine()
-            c.insertText("P(%s" % (self._statenames[self._iterate_index % len(self._statenames)],))
-        elif (curr_line.startswith("P") and curr_line.count(',') == 1 and not ")" in curr_line):
+            c.insertText(
+                f"P({self._statenames[self._iterate_index % len(self._statenames)]}"
+            )
+        elif (
+            curr_line.startswith("P")
+            and curr_line.count(',') == 1
+            and ")" not in curr_line
+        ):
             # Guess tag for P(..., X
             if not self._tnames:
                 self._iterate_index = -1
                 return
             prefix = curr_line[:curr_line.rindex(",")+1]
             c = cursorForReplacingFromStartOfLine()
-            c.insertText("%s %s" % (prefix, self._tnames[self._iterate_index % len(self._tnames)]))
+            c.insertText(
+                f"{prefix} {self._tnames[self._iterate_index % len(self._tnames)]}"
+            )
 
     def completionAAL(self):
         def parserishAAL(text, cursor):
@@ -2177,14 +2220,14 @@ on_inconc = exit(2)
         self.preview.setTabIcon(PREVIEWTAB_ERR, QtGui.QIcon())
 
         self._previewTakeFocusOnTabChange = False
-        if self._previewTabBeforeError != None:
-            _t = self._previewTabBeforeError
-            self._previewTabBeforeError = None
-            self.preview.setCurrentIndex(_t)
-        else:
+        if self._previewTabBeforeError is None:
             if self.preview.currentIndex() == PREVIEWTAB_ERR:
                 self.saveAndValidateModel()
             self.previewTabChanged(self.preview.currentIndex())
+        else:
+            _t = self._previewTabBeforeError
+            self._previewTabBeforeError = None
+            self.preview.setCurrentIndex(_t)
         self._previewTakeFocusOnTabChange = True
 
     def previewOnlyModeRefreshImages(self, retry=2):
@@ -2249,7 +2292,7 @@ class GTHighlighter(QtGui.QSyntaxHighlighter):
                 if not AALP_RE.findall(text):
                     if not NEWRULE_RE.findall(text):
                         if not text.startswith("#"):
-                            if not text.strip() == "->":
+                            if text.strip() != "->":
                                 self.setFormat(0, len(text), self._usualErrorsFormat)
                                 self.setCurrentBlockState(0)
                                 return
@@ -2344,9 +2387,7 @@ class ConfHighlighter(QtGui.QSyntaxHighlighter):
                 self.setFormat(0, len(text), self._usualErrorsFormat)
                 self.setCurrentBlockState(0)
                 return
-        # Check parenthesis
-        c = [") (".index(c)-1 for c in text if c in "()"]
-        if len(c) > 0:
+        if c := [") (".index(c) - 1 for c in text if c in "()"]:
             for i in xrange(len(c)-1): c[i+1] = c[i] + c[i+1]
             if min(c) < 0 or c[-1] != 0 or 0 in c[1:-1]:
                 self.setFormat(0, len(text), self._usualErrorsFormat)

@@ -22,7 +22,7 @@ yocto_relay = None
 idPrefix = "yoctorelay-"
 
 def log(msg):
-    remotedevices_server.daemon_log("yoctorelay plugin: %s" % (msg,))
+    remotedevices_server.daemon_log(f"yoctorelay plugin: {msg}")
 
 class RelayInterface(object):
     def __init__(self, relay):
@@ -70,7 +70,7 @@ class YoctoRelay(remotedevices_server.DeviceClass):
         errmsg = yocto_api.YRefParam()
         hub_rv = yocto_api.YAPI.RegisterHub("usb", errmsg)
         if hub_rv != yocto_api.YAPI.SUCCESS:
-            log("YAPI.RegisterHub returned error %s" % (hub_rv.value,))
+            log(f"YAPI.RegisterHub returned error {hub_rv.value}")
         relay = yocto_relay.YRelay.FirstRelay()
         while relay != None:
             self.relays[idPrefix + relay.get_hardwareId()] = relay

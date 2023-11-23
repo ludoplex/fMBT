@@ -26,7 +26,7 @@ class LightBulb(object):
     def switchOff(self, *args):
         """switch lights off"""
         self.state = "off"
-        return "switchOff got parameters " + str(args)
+        return f"switchOff got parameters {args}"
     def status(self):
         """get lights status, 'on' or 'off'"""
         return self.state

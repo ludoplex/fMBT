@@ -7,6 +7,6 @@ def foo():
     pass
 
 def direction_changed(i):
-    log('change direction on value %s' % (i,))
-    log('    dec called: %s' % (dec_called,))
+    log(f'change direction on value {i}')
+    log(f'    dec called: {dec_called}')
 

@@ -111,14 +111,11 @@ def memorise_formatter_gen(name, formatter_func=identity_formatter):
         memorise_formatter_gen.latest[name] = formatter_func(s)
         return None
     return memorise_formatter
-memorise_formatter_gen.latest = {}
 memorised_fields = ["$cf", "$eb", "$sb", "$tb"]
-for _f in memorised_fields:
-    memorise_formatter_gen.latest[_f] = "undefined"
+memorise_formatter_gen.latest = {_f: "undefined" for _f in memorised_fields}
 
 def TAU_formatter(s):
-    if s == "TAU": return "[unidentified action]"
-    return s
+    return "[unidentified action]" if s == "TAU" else s
 
 def time_formatter(s):
     return _g_time_formatter(s)
@@ -148,9 +145,7 @@ def duration_formatter(s):
 
 def remove_preceding_timestamp_formatter(s):
     m = remove_preceding_timestamp_formatter_re.match(s)
-    if not m:
-        return s
-    return s[m.end():]
+    return s if not m else s[m.end():]
 remove_preceding_timestamp_formatter_re=re.compile('[0-9]+\.[0-9]{4} ')
 
 def formatTimeDelta(s):
@@ -243,11 +238,11 @@ def extract(input_file_obj, output_file_obj, output_format, raw=0,
             for field in parsed_data:
                 if field != '$st': printable_data[field] = value_separator.join(parsed_data[field])
                 elif parsed_data[field]: printable_data[field] = parsed_data[field][0]
-            if not '<status steps="0"' in line:
+            if '<status steps="0"' not in line:
                 ppoutput = output_format % printable_data
 
             for field in must_be_nonempty:
-                if not field in parsed_data or not parsed_data[field]:
+                if field not in parsed_data or not parsed_data[field]:
                     ppoutput = None # print nothing, not all required fields present
                     break
             parsed_data = clean_data()
@@ -268,7 +263,7 @@ def extract(input_file_obj, output_file_obj, output_format, raw=0,
             parsed_data['$aL'] = []
             parsed_data['$am'] = []
             parsed_data['$tm'] = []
-        if ppoutput != None and ppoutput != empty_row:
+        if ppoutput not in [None, empty_row]:
             if first_output_line:
                 output_file_obj.write(ppoutput)
                 first_output_line = False

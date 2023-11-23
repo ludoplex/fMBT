@@ -162,19 +162,15 @@ class Tables:
         
     def load_tables(self,grammar_str, filename, make_grammar_file):
         if make_grammar_file:
-            g_file = open(filename, "wb") # 'binary' mode has been set to force \n on end of the line
-            g_file.write(grammar_str)
-            g_file.close()
-            
+            with open(filename, "wb") as g_file:
+                g_file.write(grammar_str)
         if self.sig_changed(filename):
             dparser_swigc.make_tables(grammar_str, filename)
-            sig_file = open(filename + ".md5", "wb")
-            sig_file.write(self.sig.digest())
-            sig_file.close()
-
+            with open(f"{filename}.md5", "wb") as sig_file:
+                sig_file.write(self.sig.digest())
         if self.tables:
             dparser_swigc.unload_parser_tables(self.tables)
-        self.tables = dparser_swigc.load_parser_tables(filename + ".d_parser.dat")
+        self.tables = dparser_swigc.load_parser_tables(f"{filename}.d_parser.dat")
      
     def getTables(self):
         return self.tables
@@ -191,42 +187,43 @@ class Parser:
                 raise RuntimeError
             except RuntimeError:
                 e,b,t = sys.exc_info()
-            
+
             dicts = [t.tb_frame.f_back.f_globals]
+        elif isinstance(modules, list):
+            dicts = [module.__dict__ for module in modules]
+        elif isinstance(modules, dict):
+            dicts = [modules]
         else:
-            if isinstance(modules, list):
-                dicts = [module.__dict__ for module in modules]
-            elif isinstance(modules, dict):
-                dicts = [modules]
-            else:
-                dicts = [modules.__dict__]
-                
+            dicts = [modules.__dict__]
+
         functions = []
         for dictionary in dicts:
-            f = [val for name, val in dictionary.items() 
-                 if (isinstance(val, types.FunctionType)) and name[0:2] == 'd_']
+            f = [
+                val
+                for name, val in dictionary.items()
+                if (isinstance(val, types.FunctionType)) and name[:2] == 'd_'
+            ]
             f.sort(lambda x, y: cmp(x.func_code.co_filename, y.func_code.co_filename) or cmp(x.func_code.co_firstlineno, y.func_code.co_firstlineno))
             functions.extend(f)
-        if len(functions) == 0:
+        if not functions:
             raise "\nno actions found.  Action names must start with 'd_'"
-            
-        if parser_folder == None:
+
+        if parser_folder is None:
             parser_folder = os.path.dirname(sys.argv[0])
             if len(parser_folder) == 0:
                  parser_folder = os.getcwd()
             parser_folder = string.replace(parser_folder, '\\', '/')
-            
-        self.filename = os.path.join(parser_folder, file_prefix + ".g")
-        
+
+        self.filename = os.path.join(parser_folder, f"{file_prefix}.g")
+
         grammar_str = []
         self.takes_strings = 0
         self.takes_globals = 0
         for f in functions:
-            if f.__doc__:
-                grammar_str.append(f.__doc__) 
-                self.tables.update(f.__doc__)
-            else:
+            if not f.__doc__:
                 raise "\naction missing doc string:\n\t" + f.__name__
+            grammar_str.append(f.__doc__)
+            self.tables.update(f.__doc__)
             grammar_str.append(" ${action};\n")
             if f.func_code.co_argcount == 0:
                 raise "\naction " + f.__name__ + " must take at least one argument\n"
@@ -234,29 +231,29 @@ class Parser:
             arg_types = [0]
             for i in range(1, f.func_code.co_argcount):
                 var = f.func_code.co_varnames[i]
-                if var == 'spec':
-                    arg_types.append(1)
-                    speculative = 1
-                elif var == 'g':
+                if var == 'g':
                     arg_types.append(2)
                     self.takes_globals = 1
+                elif var == 'nodes':
+                    arg_types.append(4)
+                elif var == 'parser':
+                    arg_types.append(7)
                 elif var == 's':
                     arg_types.append(3)
                     self.takes_strings = 1
-                elif var == 'nodes':
-                    arg_types.append(4)
-                elif var == 'this':
-                    arg_types.append(5)
+                elif var == 'spec':
+                    arg_types.append(1)
+                    speculative = 1
                 elif var == 'spec_only':
                     arg_types.append(6)
                     speculative = -1
-                elif var == 'parser':
-                    arg_types.append(7)
+                elif var == 'this':
+                    arg_types.append(5)
                 else:
                     raise "\nunknown argument name:\n\t" + var + "\nin function:\n\t" + f.__name__
             self.actions.append((f, arg_types, speculative))
         grammar_str = string.join(grammar_str, '')
-        
+
         self.tables.load_tables(grammar_str, self.filename, make_grammar_file)
 
     def parse(self, buf, buf_offset=0,

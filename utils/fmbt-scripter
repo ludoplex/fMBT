@@ -102,13 +102,11 @@ def _unifyIndentation(code):
     except IndexError:
         return ""
     indentation = len(firstNonemptyLine) - len(firstNonemptyLine.lstrip())
-    newLines = []
-    for oldLine in code.splitlines():
-        newLines.append(oldLine[indentation:])
+    newLines = [oldLine[indentation:] for oldLine in code.splitlines()]
     return "\n".join(newLines)
 
 def _bitmapScreenshotFilename(bitmapFilename):
-    return bitmapFilename + ".fullscreen.png"
+    return f"{bitmapFilename}.fullscreen.png"
 
 def _pythonCode(code):
     try:
@@ -128,23 +126,20 @@ def _pythonCode(code):
 class GestureEvent(object):
     __slots__ = ["time", "event", "key", "pos", "device"]
     def __init__(self, event, key, pos, timestamp=None, device=""):
-        if timestamp == None:
-            self.time = time.time()
-        else:
-            self.time = timestamp
+        self.time = time.time() if timestamp is None else timestamp
         self.event = event
         self.key = key
         self.pos = pos
         self.device = device
     def __str__(self):
-        return 'GestureEvent(time=%s, event=%s, key=%s, pos=%s, device=%s)' % (
-            self.time, repr(self.event), self.key, self.pos, repr(self.device))
+        return f'GestureEvent(time={self.time}, event={repr(self.event)}, key={self.key}, pos={self.pos}, device={repr(self.device)})'
 
 def quantify(item, quantum):
-    if not isinstance(item, tuple) and not isinstance(item, list):
-        return int(item * (1/quantum)) * quantum
+    if isinstance(item, (tuple, list)):
+        return tuple(quantify(i, quantum) for i in item)
+
     else:
-        return tuple([quantify(i, quantum) for i in item])
+        return int(item * (1/quantum)) * quantum
 
 def gestureToGti(gestureEventList):
     timeQuantum = 0.1 # seconds
@@ -172,54 +167,52 @@ def gestureToGti(gestureEventList):
             lastX, lastY = e.pos
 
     if firstEvent == "mousedown" and lastEvent == "mouseup":
-        between_events = set([e.event for e in el[1:-1]])
-        if between_events in (set(), set(["mousemove"])):
-            # event sequence: mousedown, mousemove..., mouseup
-            if duration < 3 * timeQuantum:
-                # very quick event, make it single tap
-                return ".tap((%.2f, %.2f))" % quantL(el[0].pos)
-            elif distance < 3 * locQuantum:
-                # neglible move, make it long tap
-                return ".tap((%.2f, %.2f), hold=%.1f)" % (
-                    quantL(el[0].pos) + quantT([duration]))
-            elif xDistance < 3 * locQuantum:
-                if el[-1].pos[1] < el[0].pos[1]:
-                    direction = "north"
-                    sdist = (firstY - lastY) / firstY
-                else:
-                    direction = "south"
-                    sdist = (lastY - firstY) / (1.0 - firstY)
-                # only y axis changed, we've got a swipe
-                return '.swipe((%.2f, %.2f), "%s", distance=%.2f)' % (
-                    quantL(el[0].pos) + (direction,) +
-                    quantL([sdist]))
-            elif yDistance < 3 * locQuantum:
-                if el[-1].pos[0] < el[0].pos[0]:
-                    direction = "west"
-                    sdist = (firstX - lastX) / firstX
-                else:
-                    direction = "east"
-                    sdist = (lastX - firstX) / (1.0 - firstX)
-                # only y axis changed, we've got a swipe
-                return '.swipe((%.2f, %.2f), "%s", distance=%.2f)' % (
-                    quantL(el[0].pos) + (direction,) +
-                    quantL([sdist]))
-            else:
-                return ".drag((%.2f, %.2f), (%.2f, %.2f))" % (
-                    quantL(el[0].pos) + quantL(el[-1].pos))
-        else:
+        between_events = {e.event for e in el[1:-1]}
+        if between_events not in (set(), {"mousemove"}):
             return "unknown between events"
+        # event sequence: mousedown, mousemove..., mouseup
+        if duration < 3 * timeQuantum:
+            # very quick event, make it single tap
+            return ".tap((%.2f, %.2f))" % quantL(el[0].pos)
+        elif distance < 3 * locQuantum:
+            # neglible move, make it long tap
+            return ".tap((%.2f, %.2f), hold=%.1f)" % (
+                quantL(el[0].pos) + quantT([duration]))
+        elif xDistance < 3 * locQuantum:
+            if el[-1].pos[1] < el[0].pos[1]:
+                direction = "north"
+                sdist = (firstY - lastY) / firstY
+            else:
+                direction = "south"
+                sdist = (lastY - firstY) / (1.0 - firstY)
+            # only y axis changed, we've got a swipe
+            return '.swipe((%.2f, %.2f), "%s", distance=%.2f)' % (
+                quantL(el[0].pos) + (direction,) +
+                quantL([sdist]))
+        elif yDistance < 3 * locQuantum:
+            if el[-1].pos[0] < el[0].pos[0]:
+                direction = "west"
+                sdist = (firstX - lastX) / firstX
+            else:
+                direction = "east"
+                sdist = (lastX - firstX) / (1.0 - firstX)
+            # only y axis changed, we've got a swipe
+            return '.swipe((%.2f, %.2f), "%s", distance=%.2f)' % (
+                quantL(el[0].pos) + (direction,) +
+                quantL([sdist]))
+        else:
+            return ".drag((%.2f, %.2f), (%.2f, %.2f))" % (
+                quantL(el[0].pos) + quantL(el[-1].pos))
     elif firstEvent == "keydown" and lastEvent == "keyup":
         if el[0].key.startswith("KEY_"):
             func = "Key"
-            args = ['"%s"' % (el[0].key,)]
+            args = [f'"{el[0].key}"']
         else:
             func = el[0].key
             args = []
         if duration >= 3 * timeQuantum:
             args.append("hold=%.1f" % (quantT(duration),))
-        call = '.press%s(%s)' % (func, ", ".join(args))
-        return call
+        return f'.press{func}({", ".join(args)})'
     else:
         return "unknown gesture"
 
@@ -292,35 +285,36 @@ class MyScaleEvents(QtCore.QObject):
             self.highlightedItems = []
             w.drawRect(0, 0, 0, 0, clear=True)
             if w._selectingBitmap.startswith("fmbt-scripter://view-item-at-pos"):
-                view_supported, _ = w._fmbtEval("hasattr(%s, 'view')" % (w._sut,), silent=True)
+                view_supported, _ = w._fmbtEval(f"hasattr({w._sut}, 'view')", silent=True)
                 if not view_supported:
                     log("Platform does not support view items.")
                 else:
-                    screenshotFilename = w._fmbtEval("%s.screenshot().filename()" %
-                                                     (w._sut,), silent=True)[0]
-                    if (w._fmbtEval("%s.view()" % (w._sut,), silent=True)[0]):
-                        viewFilename = w._fmbtEval("%s.view().filename()" %
-                                                   (w._sut,), silent=True)[0]
+                    screenshotFilename = w._fmbtEval(
+                        f"{w._sut}.screenshot().filename()", silent=True
+                    )[0]
+                    if w._fmbtEval(f"{w._sut}.view()", silent=True)[0]:
+                        viewFilename = w._fmbtEval(f"{w._sut}.view().filename()", silent=True)[0]
                     else:
                         viewFilename = ""
                     if w._refreshedViewOnScreen != screenshotFilename:
 
                         if viewFilename > screenshotFilename:
                             w._refreshedViewOnScreen = screenshotFilename
-                            log("Showing view data from %s" % (repr(viewFilename),))
+                            log(f"Showing view data from {repr(viewFilename)}")
                         else:
                             log("Screenshot is newer than view, reading view items...", prompt=False)
                             self.mainwindow.repaint()
-                            w._fmbtEval("%s.refreshView()" % (w._sut,))
-                            w._refreshedViewOnScreen = w._fmbtEval("%s.screenshot().filename()" %
-                                                                   (w._sut,), silent=True)[0]
-                    if w._fmbtEval("%s.view()" % (w._sut,), silent=True)[0] == None:
+                            w._fmbtEval(f"{w._sut}.refreshView()")
+                            w._refreshedViewOnScreen = w._fmbtEval(
+                                f"{w._sut}.screenshot().filename()", silent=True
+                            )[0]
+                    if w._fmbtEval(f"{w._sut}.view()", silent=True)[0] is None:
                         log("No view.")
                     else:
                         items, _ = w._fmbtEval("%s.view().findItemsByPos((%s, %s), onScreen=True)" %
                                                ((w._sut,) + self.posToAbs(event.pos)))
                         msgs = ["Items from large to small"]
-                        for index, i in enumerate(reversed(items)):
+                        for i in reversed(items):
                             w.drawRect(*i.bbox(), onOrig=False)
                             msgs.append(str(i))
                         self.highlightedItems = items
@@ -370,37 +364,33 @@ class MyScaleEvents(QtCore.QObject):
                 self.showScreenshotTooltip(event)
                 return False
             filename = self.mainwindow.bitmapStringAt(event.pos())
-            if filename == None:
+            if filename is None:
                 varname = self.mainwindow.variableNameAt(event.pos())
-                if varname == None:
+                if varname is None:
                     QtGui.QToolTip.hideText()
                     self.visibleTip = None
                     self.mainwindow.variablePresentation(None)
-                else:
-                    if self.visibleTip != varname:
-                        QtGui.QToolTip.hideText()
-                        text = self.mainwindow.variablePresentation(varname)
-                        QtGui.QToolTip.showText(event.globalPos(), text)
-                        self.visibleTip = varname
+                elif self.visibleTip != varname:
+                    QtGui.QToolTip.hideText()
+                    text = self.mainwindow.variablePresentation(varname)
+                    QtGui.QToolTip.showText(event.globalPos(), text)
+                    self.visibleTip = varname
             else:
                 filepath = self.mainwindow.bitmapFilepath(filename)
                 if filepath:
                     if self.visibleTip != filepath:
                         QtGui.QToolTip.hideText()
-                        txt = '%s<br><img src="%s">' % (filepath, filepath)
+                        txt = f'{filepath}<br><img src="{filepath}">'
                         fsfilepath = _bitmapScreenshotFilename(filepath)
                         if os.access(fsfilepath, os.R_OK):
-                            txt += '<br><img width="240" src="%s">' % (
-                                fsfilepath,)
+                            txt += f'<br><img width="240" src="{fsfilepath}">'
                         else:
-                            log("no access to %s" % (fsfilepath,))
+                            log(f"no access to {fsfilepath}")
                         QtGui.QToolTip.showText(event.globalPos(), txt)
                 else:
-                    QtGui.QToolTip.showText(event.globalPos(),
-                                            '%s<br>not in bitmapPath' % (
-                                                filename,))
+                    QtGui.QToolTip.showText(event.globalPos(), f'{filename}<br>not in bitmapPath')
                 self.visibleTip = filepath
-        elif self.mainwindow.screenshotImageIndex == None:
+        elif self.mainwindow.screenshotImageIndex is None:
             return False
         if event.type() == QtCore.QEvent.MouseMove:
             if self.mainwindow.gestureStarted:
@@ -420,10 +410,10 @@ class MyScaleEvents(QtCore.QObject):
                 cmd = self.mainwindow._sut + s
                 self.mainwindow.gestureEvents = []
                 if self.mainwindow.screenshotButtonControl.isChecked():
-                    debug("sending command %s" % (cmd,))
+                    debug(f"sending command {cmd}")
                     self.mainwindow.runStatement(cmd)
                 else:
-                    debug("dropping command %s" % (cmd,))
+                    debug(f"dropping command {cmd}")
                 if self.mainwindow.editorButtonRec.isChecked():
                     self.mainwindow.insertRecordedCommand(cmd)
 
@@ -441,7 +431,7 @@ class MyScaleEvents(QtCore.QObject):
                         QtGui.QToolTip.showText(event.globalPos(), item.dumpProperties())
                         break
         xRel, yRel = self.posToRel(event.pos)
-        if xRel == None:
+        if xRel is None:
             # cannot translate into image coordinates, do nothing
             return
         self.mainwindow._screenshotCursorX = int(x)
@@ -449,13 +439,10 @@ class MyScaleEvents(QtCore.QObject):
         self.mainwindow._screenshotCursorXRel = "%.2f" % (xRel,)
         self.mainwindow._screenshotCursorYRel = "%.2f" % (yRel,)
         try:
-            self.mainwindow._screenshotCursorRGB = (
-                self.mainwindow._fmbtEval(
-                    "%s.screenshot().getColor((%s, %s))" % (
-                        self.mainwindow._sut,
-                        self.mainwindow._screenshotCursorX,
-                        self.mainwindow._screenshotCursorY),
-                    silent=True)[0])
+            self.mainwindow._screenshotCursorRGB = self.mainwindow._fmbtEval(
+                f"{self.mainwindow._sut}.screenshot().getColor(({self.mainwindow._screenshotCursorX}, {self.mainwindow._screenshotCursorY}))",
+                silent=True,
+            )[0]
         except:
             self.mainwindow._screenshotCursorRGB = "N/A"
         self.mainwindow.editorCursorPositionChanged()
@@ -496,7 +483,7 @@ class _Completer(QtGui.QCompleter):
         self.editor = editor
         QtGui.QCompleter.__init__(self, *args, **kwargs)
     def eventFilter(self, obj, ev):
-        if not ev.type() == QtCore.QEvent.KeyPress:
+        if ev.type() != QtCore.QEvent.KeyPress:
             return False
         if self.popup().isVisible():
             if ev.type() == QtCore.QEvent.KeyPress:
@@ -511,7 +498,7 @@ class _Completer(QtGui.QCompleter):
                     self.popup().hide()
                     return True
                 else:
-                    if not ev.key() in (QtCore.Qt.Key_Escape,): # closing keys
+                    if ev.key() not in (QtCore.Qt.Key_Escape,): # closing keys
                         QtCore.QTimer.singleShot(0, self.editor.completerUpdate)
                     return QtGui.QCompleter.eventFilter(self, obj, ev)
         return False
@@ -608,7 +595,7 @@ class FilePickerWidget(QtGui.QWidget):
             if index.isValid():
                 item = self.listModel.itemFromIndex(index)
                 path = os.path.join(self.folder, item.text())
-                text = '%s <br /> <img width="300" src="%s" />' % (path, path)
+                text = f'{path} <br /> <img width="300" src="{path}" />'
                 QtGui.QToolTip.showText(event.globalPos(), text)
             else:
                 QtGui.QToolTip.hideText()
@@ -744,23 +731,21 @@ class SettingsDialog(QtGui.QDialog):
             self._inputDeviceButtons.append(b)
 
     def getRecDevices(self):
-        rv = set()
-        for i, n in enumerate(self._deviceNames):
-            if self._inputDeviceButtons[i].isChecked():
-                rv.add(n)
-        return rv
+        return {
+            n
+            for i, n in enumerate(self._deviceNames)
+            if self._inputDeviceButtons[i].isChecked()
+        }
 
     def browseDir(self, lineEdit):
-        d = QtGui.QFileDialog.getExistingDirectory()
-        if d:
+        if d := QtGui.QFileDialog.getExistingDirectory():
             lineEdit.setText(d)
 
     def addBitmapPath(self):
-        d = QtGui.QFileDialog.getExistingDirectory()
-        if d:
+        if d := QtGui.QFileDialog.getExistingDirectory():
             self.pathsBitmapPath.setText(
-                str(self.pathsBitmapPath.text()).strip() +
-                ":" + os.path.relpath(str(d), os.getcwd()))
+                f"{str(self.pathsBitmapPath.text()).strip()}:{os.path.relpath(str(d), os.getcwd())}"
+            )
 
 class fmbtscripter:
     """fmbt-scripter extension components
@@ -969,8 +954,7 @@ class MainWindow(QtGui.QMainWindow):
         # Correct buttons are chosen by screenshot viewer
         self.hwButtonList = []
         def hwButton(platform, name, layout):
-            button = QtGui.QPushButton(getattr(self, "sutButtons" + platform),
-                                       text = name)
+            button = QtGui.QPushButton(getattr(self, f"sutButtons{platform}"), text = name)
             button.setStyleSheet("padding: 4px")
             button.pressed.connect(lambda: self.buttonPressed(platform, name))
             button.released.connect(lambda: self.buttonReleased(platform, name))
@@ -1068,6 +1052,7 @@ class MainWindow(QtGui.QMainWindow):
                 vsb.setValue(vsb.maximum())
                 hsb = self.console.horizontalScrollBar()
                 hsb.setValue(hsb.minimum())
+
         _setGlobalLog(consoleLog)
 
         self.editorWidgetsLayout.addWidget(self.editorCombo)
@@ -1173,10 +1158,10 @@ class MainWindow(QtGui.QMainWindow):
 
     def bitmapStringAt(self, pos=None):
         filename = None
-        if pos != None:
-            cursor = self.editor.cursorForPosition(pos)
-        else:
+        if pos is None:
             cursor = self.editor.textCursor()
+        else:
+            cursor = self.editor.cursorForPosition(pos)
         pos = cursor.positionInBlock()
         cursor.select(QtGui.QTextCursor.LineUnderCursor)
         l = cursor.selectedText()
@@ -1202,16 +1187,13 @@ class MainWindow(QtGui.QMainWindow):
             cursor = self.editor.textCursor()
         cursor.select(QtGui.QTextCursor.WordUnderCursor)
         word = cursor.selectedText()
-        for var in self._fmbtEnv:
-            if word == var:
-                return var
-        return None
+        return next((var for var in self._fmbtEnv if word == var), None)
 
     def bitmapFilepath(self, filename):
         try:
             filepath, _ = self._fmbtEval(
-                '%s._paths.abspaths("%s")[0]' % (self._sut, filename),
-                silent=True)
+                f'{self._sut}._paths.abspaths("{filename}")[0]', silent=True
+            )
             return filepath
         except ValueError:
             return None
@@ -1232,26 +1214,29 @@ class MainWindow(QtGui.QMainWindow):
 
     def rec(self):
         # switch on/off recording in device, if supported
-        if self._fmbtEval('hasattr(%s.connection(), "sendRecStart")'
-                          % (self._sut,), silent=True)[0]:
+        if self._fmbtEval(
+            f'hasattr({self._sut}.connection(), "sendRecStart")', silent=True
+        )[0]:
             if self.editorButtonRec.isChecked():
                 self._recordingHwEvents = True
-                self._fmbtEval('%s.connection().sendRecStart(%s)' %
-                               (self._sut, repr(self._hwRecFilter["devices"])))
+                self._fmbtEval(
+                    f'{self._sut}.connection().sendRecStart({repr(self._hwRecFilter["devices"])})'
+                )
                 self._recordedTouchEvents = []
                 QtCore.QTimer.singleShot(250, self.recReadHwEvents)
             else:
                 self._recordingHwEvents = False
-                self._fmbtEval('%s.connection().sendRecStop()' % (self._sut,))
+                self._fmbtEval(f'{self._sut}.connection().sendRecStop()')
         if self.bitmapAutoSelect.isChecked():
             self.screenshotAutoRefresh.setChecked(True)
         self._previousRecordTime = None
         self.editor.setFocus()
 
     def recReadHwEvents(self):
-        events, exc = self._fmbtEval('%s.connection().recvRec()' %
-                                     (self._sut,), silent=True)
-        if self._recordingHwEvents and exc == None:
+        events, exc = self._fmbtEval(
+            f'{self._sut}.connection().recvRec()', silent=True
+        )
+        if self._recordingHwEvents and exc is None:
             if events:
                 self.handleHwEventSequence(events)
             QtCore.QTimer.singleShot(250, self.recReadHwEvents)

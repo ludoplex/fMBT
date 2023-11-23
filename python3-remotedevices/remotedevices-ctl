@@ -144,10 +144,9 @@ def _matchCode(remainder):
         try:
             key, value = match.split("=", 1)
         except ValueError:
-            error('invalid match spec: "%s", use syntax key=value' % (match,))
+            error(f'invalid match spec: "{match}", use syntax key=value')
         matchList.append((key, value))
-    matchCode = ", ".join(["%s=%s" % (k, repr(v)) for k, v in matchList])
-    return matchCode
+    return ", ".join([f"{k}={repr(v)}" for k, v in matchList])
 
 def _arg(args, accept, pickup):
     try:
@@ -161,21 +160,20 @@ def _arg(args, accept, pickup):
             if not return_opt_arg:
                 return_opt_arg = opt, arg
         else:
-            remainder.insert(0, "%s%s" % (opt, arg))
+            remainder.insert(0, f"{opt}{arg}")
     if return_opt_arg:
         return return_opt_arg + (remainder, )
 
     if "-a" in pickup:
         acqid = os.getenv("REMOTEDEVICES_ACQID", None)
+        if acqid is not None:
+            return "-a", acqid, remainder
+        try:
+            acqid = socket.gethostname()
+        except Exception:
+            pass
         if acqid != None:
             return "-a", acqid, remainder
-        else:
-            try:
-                acqid = socket.gethostname()
-            except Exception:
-                pass
-            if acqid != None:
-                return "-a", acqid, remainder
     return None, None, remainder
 
 if __name__ == "__main__":

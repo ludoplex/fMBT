@@ -211,7 +211,7 @@ fmbtgti._OCRPREPROCESS =  [
     ]
 
 def _adapterLog(msg):
-    fmbt.adapterlog("fmbtandroid: %s" % (msg,))
+    fmbt.adapterlog(f"fmbtandroid: {msg}")
 
 def _logFailedCommand(source, command, exitstatus, stdout, stderr):
     _adapterLog('in %s command "%s" failed:\n    output: %s\n    error: %s\n    status: %s' %
@@ -220,12 +220,12 @@ def _logFailedCommand(source, command, exitstatus, stdout, stderr):
 if os.name == "nt":
     import distutils.spawn
     _g_closeFds = False
-    _g_useShell = False
     _g_adbExecutable = distutils.spawn.find_executable("adb")
 else:
     _g_closeFds = True
-    _g_useShell = False
     _g_adbExecutable = "adb"
+
+_g_useShell = False
 
 def _run(command, expectedExitStatus=None, timeout=None):
     if type(command) == str:
@@ -269,48 +269,231 @@ def _run(command, expectedExitStatus=None, timeout=None):
 
     return (exitStatus, out, err)
 
-_g_keyNames = set((
-    "0", "1", "2", "3", "3D_MODE", "4", "5", "6", "7",
-    "8", "9", "A", "ALT_LEFT", "ALT_RIGHT", "APOSTROPHE",
-    "APP_SWITCH", "ASSIST", "AT", "AVR_INPUT", "AVR_POWER", "B",
-    "BACK", "BACKSLASH", "BOOKMARK", "BREAK", "BRIGHTNESS_DOWN",
-    "BRIGHTNESS_UP", "BUTTON_1", "BUTTON_10", "BUTTON_11",
-    "BUTTON_12", "BUTTON_13", "BUTTON_14", "BUTTON_15", "BUTTON_16",
-    "BUTTON_2", "BUTTON_3", "BUTTON_4", "BUTTON_5", "BUTTON_6",
-    "BUTTON_7", "BUTTON_8", "BUTTON_9", "BUTTON_A", "BUTTON_B",
-    "BUTTON_C", "BUTTON_L1", "BUTTON_L2", "BUTTON_MODE", "BUTTON_R1",
-    "BUTTON_R2", "BUTTON_SELECT", "BUTTON_START", "BUTTON_THUMBL",
-    "BUTTON_THUMBR", "BUTTON_X", "BUTTON_Y", "BUTTON_Z", "C",
-    "CALCULATOR", "CALENDAR", "CALL", "CAMERA", "CAPS_LOCK",
-    "CAPTIONS", "CHANNEL_DOWN", "CHANNEL_UP", "CLEAR", "COMMA",
-    "CONTACTS", "CTRL_LEFT", "CTRL_RIGHT", "D", "DEL", "DPAD_CENTER",
-    "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT", "DPAD_UP", "DVR", "E",
-    "EISU", "ENDCALL", "ENTER", "ENVELOPE", "EQUALS", "ESCAPE",
-    "EXPLORER", "F", "F1", "F10", "F11", "F12", "F2", "F3", "F4",
-    "F5", "F6", "F7", "F8", "F9", "FOCUS", "FORWARD", "FORWARD_DEL",
-    "FUNCTION", "G", "GRAVE", "GUIDE", "H", "HEADSETHOOK", "HENKAN",
-    "HOME", "I", "INFO", "INSERT", "J", "K", "KANA",
-    "KATAKANA_HIRAGANA", "L", "LANGUAGE_SWITCH", "LEFT_BRACKET", "M",
-    "MANNER_MODE", "MEDIA_AUDIO_TRACK", "MEDIA_CLOSE", "MEDIA_EJECT",
-    "MEDIA_FAST_FORWARD", "MEDIA_NEXT", "MEDIA_PAUSE", "MEDIA_PLAY",
-    "MEDIA_PLAY_PAUSE", "MEDIA_PREVIOUS", "MEDIA_RECORD",
-    "MEDIA_REWIND", "MEDIA_STOP", "MENU", "META_LEFT", "META_RIGHT",
-    "MINUS", "MOVE_END", "MOVE_HOME", "MUHENKAN", "MUSIC", "MUTE",
-    "N", "NOTIFICATION", "NUM", "NUMPAD_0", "NUMPAD_1", "NUMPAD_2",
-    "NUMPAD_3", "NUMPAD_4", "NUMPAD_5", "NUMPAD_6", "NUMPAD_7",
-    "NUMPAD_8", "NUMPAD_9", "NUMPAD_ADD", "NUMPAD_COMMA",
-    "NUMPAD_DIVIDE", "NUMPAD_DOT", "NUMPAD_ENTER", "NUMPAD_EQUALS",
-    "NUMPAD_LEFT_PAREN", "NUMPAD_MULTIPLY", "NUMPAD_RIGHT_PAREN",
-    "NUMPAD_SUBTRACT", "NUM_LOCK", "O", "P", "PAGE_DOWN", "PAGE_UP",
-    "PERIOD", "PICTSYMBOLS", "PLUS", "POUND", "POWER", "PROG_BLUE",
-    "PROG_GREEN", "PROG_RED", "PROG_YELLOW", "Q", "R",
-    "RIGHT_BRACKET", "RO", "S", "SCROLL_LOCK", "SEARCH", "SEMICOLON",
-    "SETTINGS", "SHIFT_LEFT", "SHIFT_RIGHT", "SLASH", "SOFT_LEFT",
-    "SOFT_RIGHT", "SPACE", "STAR", "STB_INPUT", "STB_POWER",
-    "SWITCH_CHARSET", "SYM", "SYSRQ", "T", "TAB", "TV", "TV_INPUT",
-    "TV_POWER", "U", "UNKNOWN", "V", "VOLUME_DOWN", "VOLUME_MUTE",
-    "VOLUME_UP", "W", "WINDOW", "X", "Y", "YEN", "Z",
-    "ZENKAKU_HANKAKU", "ZOOM_IN", "ZOOM_OUT"))
+_g_keyNames = {
+    "0",
+    "1",
+    "2",
+    "3",
+    "3D_MODE",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "A",
+    "ALT_LEFT",
+    "ALT_RIGHT",
+    "APOSTROPHE",
+    "APP_SWITCH",
+    "ASSIST",
+    "AT",
+    "AVR_INPUT",
+    "AVR_POWER",
+    "B",
+    "BACK",
+    "BACKSLASH",
+    "BOOKMARK",
+    "BREAK",
+    "BRIGHTNESS_DOWN",
+    "BRIGHTNESS_UP",
+    "BUTTON_1",
+    "BUTTON_10",
+    "BUTTON_11",
+    "BUTTON_12",
+    "BUTTON_13",
+    "BUTTON_14",
+    "BUTTON_15",
+    "BUTTON_16",
+    "BUTTON_2",
+    "BUTTON_3",
+    "BUTTON_4",
+    "BUTTON_5",
+    "BUTTON_6",
+    "BUTTON_7",
+    "BUTTON_8",
+    "BUTTON_9",
+    "BUTTON_A",
+    "BUTTON_B",
+    "BUTTON_C",
+    "BUTTON_L1",
+    "BUTTON_L2",
+    "BUTTON_MODE",
+    "BUTTON_R1",
+    "BUTTON_R2",
+    "BUTTON_SELECT",
+    "BUTTON_START",
+    "BUTTON_THUMBL",
+    "BUTTON_THUMBR",
+    "BUTTON_X",
+    "BUTTON_Y",
+    "BUTTON_Z",
+    "C",
+    "CALCULATOR",
+    "CALENDAR",
+    "CALL",
+    "CAMERA",
+    "CAPS_LOCK",
+    "CAPTIONS",
+    "CHANNEL_DOWN",
+    "CHANNEL_UP",
+    "CLEAR",
+    "COMMA",
+    "CONTACTS",
+    "CTRL_LEFT",
+    "CTRL_RIGHT",
+    "D",
+    "DEL",
+    "DPAD_CENTER",
+    "DPAD_DOWN",
+    "DPAD_LEFT",
+    "DPAD_RIGHT",
+    "DPAD_UP",
+    "DVR",
+    "E",
+    "EISU",
+    "ENDCALL",
+    "ENTER",
+    "ENVELOPE",
+    "EQUALS",
+    "ESCAPE",
+    "EXPLORER",
+    "F",
+    "F1",
+    "F10",
+    "F11",
+    "F12",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "FOCUS",
+    "FORWARD",
+    "FORWARD_DEL",
+    "FUNCTION",
+    "G",
+    "GRAVE",
+    "GUIDE",
+    "H",
+    "HEADSETHOOK",
+    "HENKAN",
+    "HOME",
+    "I",
+    "INFO",
+    "INSERT",
+    "J",
+    "K",
+    "KANA",
+    "KATAKANA_HIRAGANA",
+    "L",
+    "LANGUAGE_SWITCH",
+    "LEFT_BRACKET",
+    "M",
+    "MANNER_MODE",
+    "MEDIA_AUDIO_TRACK",
+    "MEDIA_CLOSE",
+    "MEDIA_EJECT",
+    "MEDIA_FAST_FORWARD",
+    "MEDIA_NEXT",
+    "MEDIA_PAUSE",
+    "MEDIA_PLAY",
+    "MEDIA_PLAY_PAUSE",
+    "MEDIA_PREVIOUS",
+    "MEDIA_RECORD",
+    "MEDIA_REWIND",
+    "MEDIA_STOP",
+    "MENU",
+    "META_LEFT",
+    "META_RIGHT",
+    "MINUS",
+    "MOVE_END",
+    "MOVE_HOME",
+    "MUHENKAN",
+    "MUSIC",
+    "MUTE",
+    "N",
+    "NOTIFICATION",
+    "NUM",
+    "NUMPAD_0",
+    "NUMPAD_1",
+    "NUMPAD_2",
+    "NUMPAD_3",
+    "NUMPAD_4",
+    "NUMPAD_5",
+    "NUMPAD_6",
+    "NUMPAD_7",
+    "NUMPAD_8",
+    "NUMPAD_9",
+    "NUMPAD_ADD",
+    "NUMPAD_COMMA",
+    "NUMPAD_DIVIDE",
+    "NUMPAD_DOT",
+    "NUMPAD_ENTER",
+    "NUMPAD_EQUALS",
+    "NUMPAD_LEFT_PAREN",
+    "NUMPAD_MULTIPLY",
+    "NUMPAD_RIGHT_PAREN",
+    "NUMPAD_SUBTRACT",
+    "NUM_LOCK",
+    "O",
+    "P",
+    "PAGE_DOWN",
+    "PAGE_UP",
+    "PERIOD",
+    "PICTSYMBOLS",
+    "PLUS",
+    "POUND",
+    "POWER",
+    "PROG_BLUE",
+    "PROG_GREEN",
+    "PROG_RED",
+    "PROG_YELLOW",
+    "Q",
+    "R",
+    "RIGHT_BRACKET",
+    "RO",
+    "S",
+    "SCROLL_LOCK",
+    "SEARCH",
+    "SEMICOLON",
+    "SETTINGS",
+    "SHIFT_LEFT",
+    "SHIFT_RIGHT",
+    "SLASH",
+    "SOFT_LEFT",
+    "SOFT_RIGHT",
+    "SPACE",
+    "STAR",
+    "STB_INPUT",
+    "STB_POWER",
+    "SWITCH_CHARSET",
+    "SYM",
+    "SYSRQ",
+    "T",
+    "TAB",
+    "TV",
+    "TV_INPUT",
+    "TV_POWER",
+    "U",
+    "UNKNOWN",
+    "V",
+    "VOLUME_DOWN",
+    "VOLUME_MUTE",
+    "VOLUME_UP",
+    "W",
+    "WINDOW",
+    "X",
+    "Y",
+    "YEN",
+    "Z",
+    "ZENKAKU_HANKAKU",
+    "ZOOM_IN",
+    "ZOOM_OUT",
+}
 
 sortItems = fmbtgti.sortItems
 
@@ -335,9 +518,7 @@ def listSerialNumbers(adbPort=None):
     deviceLines = [l for l in deviceLines
                    if l.strip() != "" and not l.startswith("*")]
 
-    potentialDevices = [line.split()[0] for line in deviceLines]
-
-    return potentialDevices
+    return [line.split()[0] for line in deviceLines]
 
 class Device(fmbtgti.GUITestInterface):
     """
@@ -526,10 +707,7 @@ class Device(fmbtgti.GUITestInterface):
         """
         Return 3-axis accelerometer readings.
         """
-        if self._conn:
-            return self._conn.recvLastAccelerometer()
-        else:
-            return (None, None, None)
+        return self._conn.recvLastAccelerometer() if self._conn else (None, None, None)
 
     def accelerometerRotation(self):
         """
@@ -556,7 +734,7 @@ class Device(fmbtgti.GUITestInterface):
 
         Return True if successful, otherwise False.
         """
-        callCommand = 'service call phone 1 s16 "%s"' % (contact,)
+        callCommand = f'service call phone 1 s16 "{contact}"'
         status, out, err = self.shellSOE(callCommand)
         if status != 0:
             _logFailedCommand("callContact", callCommand, status, out, err)
@@ -570,7 +748,7 @@ class Device(fmbtgti.GUITestInterface):
 
         Return True if successful, otherwise False.
         """
-        callCommand = "am start -a android.intent.action.CALL -d 'tel:%s'" % (number,)
+        callCommand = f"am start -a android.intent.action.CALL -d 'tel:{number}'"
         status, out, err = self.shellSOE(callCommand)
         if status != 0:
             _logFailedCommand("callNumber", callCommand, status, out, err)
@@ -603,7 +781,7 @@ class Device(fmbtgti.GUITestInterface):
           tag (string, optional):
                   tag for the log entry, the default is "fMBT".
         """
-        if not priority.lower() in ["v", "d", "i", "w", "e"]:
+        if priority.lower() not in ["v", "d", "i", "w", "e"]:
             return False
         return self.existingConnection().sendDeviceLog(
             msg, priority.lower(), tag)
@@ -619,19 +797,13 @@ class Device(fmbtgti.GUITestInterface):
 
           d.refreshScreenshot(rotate=-d.displayRotation())
         """
-        if self._conn:
-            return self._conn.recvCurrentDisplayOrientation()
-        else:
-            return None
+        return self._conn.recvCurrentDisplayOrientation() if self._conn else None
 
     def displayPowered(self):
         """
         Returns True if display is powered, otherwise False.
         """
-        if self._conn:
-            return self._conn.recvDisplayPowered()
-        else:
-            return None
+        return self._conn.recvDisplayPowered() if self._conn else None
 
     def drag(self, (x1, y1), (x2, y2), delayBetweenMoves=None, delayBeforeMoves=None, delayAfterMoves=None, movePoints=None):
         """
@@ -927,12 +1099,15 @@ class Device(fmbtgti.GUITestInterface):
                   modifier key(s) to be pressed at the same time.
         """
         if not keyName.upper().startswith("KEYCODE_"):
-            keyName = "KEYCODE_" + keyName
+            keyName = f"KEYCODE_{keyName}"
         keyName = keyName.upper()
         if modifiers != None:
             modifiers = [
-                m.upper() if m.upper().startswith("KEYCODE_") else "KEYCODE_" + m.upper()
-                for m in modifiers]
+                m.upper()
+                if m.upper().startswith("KEYCODE_")
+                else f"KEYCODE_{m.upper()}"
+                for m in modifiers
+            ]
         return fmbtgti.GUITestInterface.pressKey(self, keyName, long, hold, modifiers)
 
     def pressMenu(self, **pressKeyKwArgs):
@@ -1026,22 +1201,16 @@ class Device(fmbtgti.GUITestInterface):
             rotate = ROTATION_DEGS[rotate]
         elif rotate in [-ROTATION_0, -ROTATION_90, -ROTATION_180, -ROTATION_270]:
             rotate = -ROTATION_DEGS[-rotate]
-        elif rotate == None:
+        elif rotate is None:
             if self._autoRotateScreenshot:
-                if not forcedScreenshot:
-                    drot = self.displayRotation()
-                else:
-                    drot = None
+                drot = self.displayRotation() if not forcedScreenshot else None
                 if drot != None:
                     return self.refreshScreenshot(forcedScreenshot, rotate=-drot)
         rv = fmbtgti.GUITestInterface.refreshScreenshot(self, forcedScreenshot, rotate)
-        if rv:
-            if not forcedScreenshot:
-                self._screenSize = self.existingConnection().recvScreenSize()
-            else:
-                self._screenSize = self.screenshot().size()
-        else:
+        if rv and not forcedScreenshot or not rv:
             self._screenSize = self.existingConnection().recvScreenSize()
+        else:
+            self._screenSize = self.screenshot().size()
         return rv
     refreshScreenshot.__doc__ = fmbtgti.GUITestInterface.refreshScreenshot.__doc__
 
@@ -1067,10 +1236,7 @@ class Device(fmbtgti.GUITestInterface):
                 filename,
                 "\n    ".join(["line %s: %s error: %s" % e for e in errors]),)
 
-        if self._conn:
-            displayToScreen = self._conn._displayToScreen
-        else:
-            displayToScreen = None
+        displayToScreen = self._conn._displayToScreen if self._conn else None
         if forcedView != None:
             if isinstance(forcedView, View):
                 self._lastView = forcedView
@@ -1083,7 +1249,11 @@ class Device(fmbtgti.GUITestInterface):
 
         retryCount = 0
         while True:
-            if uiautomatorDump == True or (uiautomatorDump == None and self.uiautomatorDump()):
+            if (
+                uiautomatorDump == True
+                or uiautomatorDump is None
+                and self.uiautomatorDump()
+            ):
                 dump = self.existingConnection().recvUiautomatorDump()
             else:
                 try:
@@ -1099,7 +1269,7 @@ class Device(fmbtgti.GUITestInterface):
                 view = None
                 # fail quickly if there is no answer
                 retryCount += self._PARSE_VIEW_RETRY_LIMIT / 2
-            if dump == None or len(view.errors()) > 0:
+            if dump is None or len(view.errors()) > 0:
                 if view:
                     _adapterLog(formatErrors(view.errors(), view.filename()))
                 if retryCount < self._PARSE_VIEW_RETRY_LIMIT:
@@ -1118,17 +1288,12 @@ class Device(fmbtgti.GUITestInterface):
         """
         Return True if showing lockscreen, otherwise False.
         """
-        if self._conn:
-            return self._conn.recvShowingLockscreen()
-        else:
-            return None
+        return self._conn.recvShowingLockscreen() if self._conn else None
 
     def screenSize(self):
-        if self._screenSize:
-            return self._screenSize
-        else:
+        if not self._screenSize:
             self._screenSize = fmbtgti.GUITestInterface.screenSize(self)
-            return self._screenSize
+        return self._screenSize
 
     def setAccelerometer(self, abc):
         """
@@ -1149,10 +1314,7 @@ class Device(fmbtgti.GUITestInterface):
           d.setAccelerometer((0, 9.8))
           d.setAccelerometer((-9.6, 0.2, 0.8))
         """
-        if self._conn:
-            return self._conn.sendAcceleration(abc)
-        else:
-            return False
+        return self._conn.sendAcceleration(abc) if self._conn else False
 
     def setAccelerometerRotation(self, value):
         """
@@ -1166,10 +1328,7 @@ class Device(fmbtgti.GUITestInterface):
 
         Returns True if successful, otherwise False.
         """
-        if self._conn:
-            return self._conn.sendAccelerometerRotation(value)
-        else:
-            return False
+        return self._conn.sendAccelerometerRotation(value) if self._conn else False
 
     def setAutoRotateScreenshot(self, value):
         """
@@ -1186,10 +1345,7 @@ class Device(fmbtgti.GUITestInterface):
 
         See also autoRotateScreenshot(), displayRotation().
         """
-        if value:
-            self._autoRotateScreenshot = True
-        else:
-            self._autoRotateScreenshot = False
+        self._autoRotateScreenshot = bool(value)
 
     def setConnection(self, connection):
         self._lastConnectionSettings = {}
@@ -1213,13 +1369,13 @@ class Device(fmbtgti.GUITestInterface):
         Returns None.
         """
         width, height = size
-        if width == None or height == None:
+        if width is None or height is None:
             w, h = self.existingConnection().recvScreenSize()
             if w == h == 0:
                 w, h = self.existingConnection().recvDefaultViewportSize()
-        if width == None:
+        if width is None:
             width = w
-        if height == None:
+        if height is None:
             height = h
         screenWidth, screenHeight = self.screenSize()
         self.existingConnection().setScreenToDisplayCoords(
@@ -1268,12 +1424,9 @@ class Device(fmbtgti.GUITestInterface):
         elif rotation in ROTATION_DEGS:
             rotation = ROTATION_DEGS.index(rotation)
         else:
-            raise ValueError('invalid rotation "%s"' % (rotation,))
+            raise ValueError(f'invalid rotation "{rotation}"')
 
-        if self._conn:
-            return self._conn.sendUserRotation(rotation)
-        else:
-            return False
+        return self._conn.sendUserRotation(rotation) if self._conn else False
 
     def shell(self, shellCommand, timeout=None):
         """
@@ -1345,7 +1498,7 @@ class Device(fmbtgti.GUITestInterface):
         if status != 0:
             _logFailedCommand("sms", smsCommand, status, out, err)
             return False
-        _adapterLog("SMS command returned %s" % (out + err,))
+        _adapterLog(f"SMS command returned {out + err}")
         time.sleep(2)
         if 'talk' in self.topWindow():
             _adapterLog("Messaging app is Hangouts")
@@ -1375,13 +1528,10 @@ class Device(fmbtgti.GUITestInterface):
 
         Returns True if view data can be read, otherwise False.
         """
-        if self._supportsView == None:
+        if self._supportsView is None:
             try:
                 if self.uiautomatorDump():
-                    if self.existingConnection().recvUiautomatorDump():
-                        self._supportsView = True
-                    else:
-                        self._supportsView = False
+                    self._supportsView = bool(self.existingConnection().recvUiautomatorDump())
                 else:
                     self.existingConnection().recvViewData()
                     self._supportsView = True
@@ -1437,9 +1587,8 @@ class Device(fmbtgti.GUITestInterface):
         items = self._lastView.findItemsById(viewItemId, count=1, onScreen=True)
         if len(items) > 0:
             return self.tapItem(items[0], **tapKwArgs)
-        else:
-            _adapterLog("tapItemById(%s): no items found" % (viewItemId,))
-            return False
+        _adapterLog(f"tapItemById({viewItemId}): no items found")
+        return False
 
     def tapText(self, text, partial=False, **tapKwArgs):
         """
@@ -1461,8 +1610,7 @@ class Device(fmbtgti.GUITestInterface):
         """
         assert self._lastView != None, "View required."
         items = self._lastView.findItemsByText(text, partial=partial, count=1, onScreen=True)
-        if len(items) == 0: return False
-        return self.tapItem(items[0], **tapKwArgs)
+        return False if len(items) == 0 else self.tapItem(items[0], **tapKwArgs)
 
     def tapContentDesc(self, contentDesc, **tapKwArgs):
         """
@@ -1489,17 +1637,13 @@ class Device(fmbtgti.GUITestInterface):
         """
         assert self._lastView != None, "View required."
         items = self._lastView.findItemsByContentDesc(contentDesc)
-        if len(items) == 0: return False
-        return self.tapItem(items[0], **tapKwArgs)
+        return False if len(items) == 0 else self.tapItem(items[0], **tapKwArgs)
 
     def topApp(self):
         """
         Returns the name of the top application.
         """
-        if not self._conn:
-            return None
-        else:
-            return self._conn.recvTopAppWindow()[0]
+        return None if not self._conn else self._conn.recvTopAppWindow()[0]
 
     def topWindow(self):
         """
@@ -1513,7 +1657,7 @@ class Device(fmbtgti.GUITestInterface):
         pollDelay = 0.2
         start = time.time()
         tw = self.existingConnection().recvTopAppWindow()[1]
-        while tw == None and (time.time() - start < timeout):
+        while tw is None and time.time() - start < timeout:
             time.sleep(pollDelay)
             tw = self.existingConnection().recvTopAppWindow()[1]
         return tw
@@ -1550,10 +1694,7 @@ class Device(fmbtgti.GUITestInterface):
         Example:
           d.uninstall("com.android.python27")
         """
-        if self._conn:
-            return self._conn.uninstall(apkname, keepData)
-        else:
-            return False
+        return self._conn.uninstall(apkname, keepData) if self._conn else False
 
     def userRotation(self):
         """
@@ -1722,7 +1863,7 @@ class Ini:
         """
         Returns list of sections in the current configuration.
         """
-        return list(set([k[0] for k in self._conf.keys()]))
+        return list({k[0] for k in self._conf.keys()})
 
     def keys(self, section):
         """
@@ -1742,9 +1883,11 @@ class Ini:
         """
         lines = []
         for section in sorted(self.sections()):
-            lines.append("[%s]" % (section,))
-            for key in sorted(self.keys(section)):
-                lines.append("%-16s = %s" % (key, self._conf[(section, key)]))
+            lines.append(f"[{section}]")
+            lines.extend(
+                "%-16s = %s" % (key, self._conf[(section, key)])
+                for key in sorted(self.keys(section))
+            )
             lines.append("")
         return "\n".join(lines)
 
@@ -1783,7 +1926,7 @@ class Ini:
         returned (the default) value. This makes all returned values
         visible in dump().
         """
-        if not (section, key) in self._conf:
+        if (section, key) not in self._conf:
             self._conf[(section, key)] = default
         return self._conf[(section, key)]
 
@@ -1808,15 +1951,12 @@ class ViewItem(fmbtgti.GUIItem):
         else:
             self._id = self.property("mID")
         self._rawProps = ""
-        if not "bounds" in self._p:
-            if not "scrolling:mScrollX" in self._p:
+        if "bounds" not in self._p:
+            if "scrolling:mScrollX" not in self._p:
                 self._p["scrolling:mScrollX"] = 0
                 self._p["scrolling:mScrollY"] = 0
             self._visible = self._p.get("getVisibility()", "") == "VISIBLE"
-            if "text:mText" in self._p:
-                self._text = self._p["text:mText"]
-            else:
-                self._text = None
+            self._text = self._p["text:mText"] if "text:mText" in self._p else None
         else:
             self._visible = True
             self._text = self._p["text"]
@@ -1831,7 +1971,7 @@ class ViewItem(fmbtgti.GUIItem):
                     int(v) for v in
                     ViewItem._boundsRegEx.findall(self._p["bounds"])[0]]
             except IndexError:
-                raise ValueError('invalid bounds "%s"' % (self._p["bounds"],))
+                raise ValueError(f'invalid bounds "{self._p["bounds"]}"')
             width = right - left
             height = bottom - top
         elif "layout:getLocationOnScreen_x()" in self._p:
@@ -1881,25 +2021,35 @@ class ViewItem(fmbtgti.GUIItem):
         return self._visible
     def dump(self):
         p = self._p
-        return ("ViewItem(\n\tchildren = %d\n\tclassName = '%s'\n\tcode = '%s'\n\t" +
-                "indent = %d\n\tproperties = {\n\t\t%s\n\t})") % (
-            len(self._children), self._className, self._code, self._indent,
-            '\n\t\t'.join(['"%s": %s' % (key, p[key]) for key in sorted(p.keys())]))
+        return (
+            "ViewItem(\n\tchildren = %d\n\tclassName = '%s'\n\tcode = '%s'\n\t"
+            + "indent = %d\n\tproperties = {\n\t\t%s\n\t})"
+        ) % (
+            len(self._children),
+            self._className,
+            self._code,
+            self._indent,
+            '\n\t\t'.join([f'"{key}": {p[key]}' for key in sorted(p.keys())]),
+        )
     def dumpProperties(self):
         rv = []
         if self._p:
-            for key in [k for k in sorted(self._p.keys()) if not "layout:" in k and not "padding:" in k and not "drawing:" in k]: # sorted(self._p.keys()): # [k for k in sorted(self._p.keys()) if not ":" in k]:
-                rv.append("%s=%s" % (key, self._p[key]))
+            rv.extend(
+                f"{key}={self._p[key]}"
+                for key in [
+                    k
+                    for k in sorted(self._p.keys())
+                    if "layout:" not in k
+                    and "padding:" not in k
+                    and "drawing:" not in k
+                ]
+            )
         return "\n".join(rv)
     def __str__(self):
-        if self.text():
-            text = ", text=%s" % (repr(self.text()),)
-        else:
-            text = ""
+        text = f", text={repr(self.text())}" if self.text() else ""
         if "content-desc" in self._p and self._p["content-desc"]:
-            text += ", content_desc=%s" % (repr(self.content_desc(),))
-        return ("ViewItem(className=%s, id=%s, bbox=%s%s)"  % (
-                repr(self._className), repr(self.id()), self.bbox(), text))
+            text += f", content_desc={repr(self.content_desc())}"
+        return f"ViewItem(className={repr(self._className)}, id={repr(self.id())}, bbox={self.bbox()}{text})"
 
 class View(object):
     """
@@ -1939,10 +2089,8 @@ class View(object):
     def errors(self): return self._errors
     def dumpRaw(self): return self._dump
     def dumpItems(self, itemList = None):
-        if itemList == None: itemList = self._viewItems
-        l = []
-        for i in itemList:
-            l.append(self._dumpItem(i))
+        if itemList is None: itemList = self._viewItems
+        l = [self._dumpItem(i) for i in itemList]
         return '\n'.join(l)
     def dumpTree(self, rootItem = None):
         l = []
@@ -1954,18 +2102,15 @@ class View(object):
                     l.extend(self._dumpSubTree(i, 0))
         return '\n'.join(l)
     def _dumpSubTree(self, viewItem, indent):
-        l = []
         i = viewItem
-        l.append(" "*indent + self._dumpItem(viewItem))
+        l = [" "*indent + self._dumpItem(viewItem)]
         for i in viewItem.children():
             l.extend(self._dumpSubTree(i, indent + 4))
         return l
     def _dumpItem(self, viewItem):
         i = viewItem
-        if i.text() != None: t = '"%s"' % (i.text(),)
-        else: t = None
-        return "id=%s cls=%s text=%s bbox=%s vis=%s" % (
-            i.id(), i.className(), t, i.bbox(), i.visibleBranch())
+        t = f'"{i.text()}"' if i.text() != None else None
+        return f"id={i.id()} cls={i.className()} text={t} bbox={i.bbox()} vis={i.visibleBranch()}"
     def filename(self):
         return self._rawDumpFilename
 
@@ -2004,12 +2149,7 @@ class View(object):
             for c in searchRootItem.children():
                 foundItems.extend(self.findItems(comparator, count=count-len(foundItems), searchRootItem=c, onScreen=onScreen))
         else:
-            if searchItems != None:
-                # find from listed items only
-                searchDomain = searchItems
-            else:
-                # find from all items
-                searchDomain = self._viewItems
+            searchDomain = searchItems if searchItems != None else self._viewItems
             for i in searchDomain:
                 if comparator(i) and (
                         not onScreen or
@@ -2267,8 +2407,7 @@ class View(object):
         return self._viewItems
 
     def __str__(self):
-        return 'View(items=%s, dump="%s")' % (
-            len(self._viewItems), self._rawDumpFilename)
+        return f'View(items={len(self._viewItems)}, dump="{self._rawDumpFilename}")'
 
 class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
     """
@@ -2318,7 +2457,7 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
 
     def settings(self):
         """Returns restorable property values"""
-        rv = {
+        return {
             "adbPort": self._adbPort,
             "adbForwardPort": self._monkeyPortForward,
             "stopOnError": self._stopOnError,
@@ -2328,7 +2467,6 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
             "screenToDisplay": self._screenToDisplay,
             "displayToScreen": self._displayToScreen,
         }
-        return rv
 
     def target(self):
         return self._serialNumber
@@ -2342,16 +2480,10 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
         return contents
 
     def _runAdb(self, adbCommand, expectedExitStatus=0, timeout=None):
-        if not self._stopOnError:
-            expect = None
-        else:
-            expect = expectedExitStatus
-        if self._adbPort:
-            adbPortArgs = ["-P", str(self._adbPort)]
-        else:
-            adbPortArgs = []
+        expect = None if not self._stopOnError else expectedExitStatus
+        adbPortArgs = ["-P", str(self._adbPort)] if self._adbPort else []
         command = [_g_adbExecutable, "-s", self._serialNumber] + adbPortArgs
-        if type(adbCommand) == list or type(adbCommand) == tuple:
+        if type(adbCommand) in [list, tuple]:
             command.extend(adbCommand)
         else:
             command.append(adbCommand)
@@ -2402,47 +2534,35 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
 
         outputLines = self._runAdb(["shell", "id"],
                                    timeout=_SHORT_TIMEOUT)[1].splitlines()
-        if len(outputLines) == 1 and "uid=0" in outputLines[0]:
-            self._shellUid0 = True
-        else:
-            self._shellUid0 = False
+        self._shellUid0 = len(outputLines) == 1 and "uid=0" in outputLines[0]
         try:
             outputLines = self._runAdb(["shell", "su", "root", "id"],
                                        timeout=_SHORT_TIMEOUT)[1].splitlines()
         except:
             outputLines = [] # Probably "su" cannot be executed => no su support
-        if len(outputLines) == 1 and "uid=0" in outputLines[0]:
-            self._shellSupportsSu = True
-        else:
-            self._shellSupportsSu = False
-
+        self._shellSupportsSu = len(outputLines) == 1 and "uid=0" in outputLines[0]
         outputLines = self._runAdb(["shell", "tar"],
                                    expectedExitStatus=EXITSTATUS_ANY,
                                    timeout=_SHORT_TIMEOUT)[1].splitlines()
-        if len(outputLines) == 1 and "bin" in outputLines[0]:
-            self._shellSupportsTar = False
-        else:
-            self._shellSupportsTar = True
-
+        self._shellSupportsTar = len(outputLines) != 1 or "bin" not in outputLines[0]
         outputLines = self._runAdb(["shell", "echo -n foo | toybox base64"],
                                    expectedExitStatus=EXITSTATUS_ANY,
                                    timeout=_SHORT_TIMEOUT)[1].splitlines()
-        if len(outputLines) == 1 and "Zm9v" in outputLines[0]:
-            self._shellSupportsToyboxBase64 = True
-        else:
-            self._shellSupportsToyboxBase64 = False
-
+        self._shellSupportsToyboxBase64 = (
+            len(outputLines) == 1 and "Zm9v" in outputLines[0]
+        )
         outputLines = self._runAdb(["shell", "echo -n foo | uuencode -"],
                                    expectedExitStatus=EXITSTATUS_ANY,
                                    timeout=_SHORT_TIMEOUT)[1].splitlines()
-        if len(outputLines) > 0 and "begin" in outputLines[0]:
-            self._shellSupportsUuencode = True
-        else:
-            self._shellSupportsUuencode = False
+        self._shellSupportsUuencode = (
+            len(outputLines) > 0 and "begin" in outputLines[0]
+        )
 
     def _resetWindow(self):
-        setupCommands = [["shell", "service" , "call", "window", "1", "i32", "4939"],
-                         ["forward", "tcp:"+str(self._windowPortForward), "tcp:4939"]]
+        setupCommands = [
+            ["shell", "service", "call", "window", "1", "i32", "4939"],
+            ["forward", f"tcp:{str(self._windowPortForward)}", "tcp:4939"],
+        ]
         for c in setupCommands:
             self._runSetupCmd(c)
 
@@ -2524,7 +2644,9 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
                 return True, None
             elif data.startswith("OK:"):
                 return True, data.split("OK:")[1]
-            _adapterLog("monkeyCommand failing... command: '%s' response: '%s'" % (command, data))
+            _adapterLog(
+                f"monkeyCommand failing... command: '{command}' response: '{data}'"
+            )
             return False, None
         except socket.error:
             try: self._monkeySocket.close()
@@ -2534,7 +2656,9 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
                 self._resetMonkey()
                 return self._monkeyCommand(command, retry=retry-1)
             else:
-                raise AndroidConnectionError('Android monkey socket connection lost while sending command "%s"' % (command,))
+                raise AndroidConnectionError(
+                    f'Android monkey socket connection lost while sending command "{command}"'
+                )
 
     def install(self, filename, lock, reinstall, downgrade,
                 sdcard, algo, key, iv):
@@ -2555,10 +2679,7 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
             cmd.extend(["--iv", iv])
         cmd.append(filename)
         status, output, error = self._runAdb(cmd, [0, 1], timeout=_LONG_TIMEOUT)
-        if "Success" in output:
-            return True
-        else:
-            return output + "\n" + error
+        return True if "Success" in output else output + "\n" + error
 
     def uninstall(self, apkname, keepData):
         cmd = ["uninstall"]
@@ -2567,10 +2688,7 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
         cmd.append(apkname)
         status, output, error = self._runAdb(
             cmd, expectedExitStatus=EXITSTATUS_ANY, timeout=_LONG_TIMEOUT)
-        if "Success" in output:
-            return True
-        else:
-            return False
+        return "Success" in output
 
     def pkill(self, pattern, signal=15, exact=False):
         """send signal to all processes where process name contains pattern"""
@@ -2586,17 +2704,17 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
                 if exact:
                     if pattern == fields[7]:
                         pids.append(fields[1])
-                else:
-                    if pattern in " ".join(fields[7:]):
-                        pids.append(fields[1])
-        if pids:
-            _adapterLog(str(shell_kill + ["-" + str(signal)] + pids))
-            self._runAdb(shell_kill + ["-" + str(signal)] + pids,
-                         expectedExitStatus=EXITSTATUS_ANY,
-                         timeout=_SHORT_TIMEOUT)
-            return True
-        else:
+                elif pattern in " ".join(fields[7:]):
+                    pids.append(fields[1])
+        if not pids:
             return False
+        _adapterLog(str(shell_kill + [f"-{str(signal)}"] + pids))
+        self._runAdb(
+            shell_kill + [f"-{str(signal)}"] + pids,
+            expectedExitStatus=EXITSTATUS_ANY,
+            timeout=_SHORT_TIMEOUT,
+        )
+        return True
 
     def recvPlatformVersion(self):
         return self._platformVersion
@@ -2612,14 +2730,16 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
                          timeout=_SHORT_TIMEOUT)
 
         self._runAdb("reboot", expectedExitStatus=EXITSTATUS_ANY)
-        _adapterLog("rebooting " + self._serialNumber)
+        _adapterLog(f"rebooting {self._serialNumber}")
 
         if reconnect:
             time.sleep(2)
             endTime = time.time() + timeout
             status, _, _ = self._runAdb("wait-for-device", expectedExitStatus=None, timeout=timeout)
             if status != 0:
-                raise AndroidDeviceNotFound('"timeout -k 1 %s adb wait-for-device" status %s' % (timeout, status))
+                raise AndroidDeviceNotFound(
+                    f'"timeout -k 1 {timeout} adb wait-for-device" status {status}'
+                )
             self._detectFeatures()
             while time.time() < endTime:
                 try:
@@ -2629,18 +2749,15 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
                     pass
                 time.sleep(1)
             else:
-                msg = "reboot: reconnecting to " + self._serialNumber + " failed"
+                msg = f"reboot: reconnecting to {self._serialNumber} failed"
                 _adapterLog(msg)
                 raise AndroidConnectionError(msg)
             self._resetWindow()
         return True
 
     def recvVariable(self, variableName):
-        ok, value = self._monkeyCommand("getvar " + variableName)
-        if ok: return value
-        else:
-            # LOG: getvar variableName failed
-            return None
+        ok, value = self._monkeyCommand(f"getvar {variableName}")
+        return value if ok else None
 
     def recvScreenSize(self):
         _, output, _ = self._runAdb(["shell", "dumpsys", "display"], 0,
@@ -2685,8 +2802,7 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
     def recvCurrentDisplayOrientation(self):
         _, output, _ = self._runAdb(["shell", "dumpsys", "display"], 0,
                                     timeout=_SHORT_TIMEOUT)
-        s = re.findall("mCurrentOrientation=([0-9])", output)
-        if s:
+        if s := re.findall("mCurrentOrientation=([0-9])", output):
             return int(s[0])
         else:
             return None
@@ -2694,8 +2810,7 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
     def recvDisplayPowered(self):
         _, output, _ = self._runAdb(["shell", "dumpsys", "power"], 0,
                                     timeout=_SHORT_TIMEOUT)
-        s = re.findall("Display Power: state=(OFF|ON)", output)
-        if s:
+        if s := re.findall("Display Power: state=(OFF|ON)", output):
             return s[0] == "ON"
         else:
             return None
@@ -2703,12 +2818,8 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
     def recvShowingLockscreen(self):
         _, output, _ = self._runAdb(["shell", "dumpsys", "window"], 0,
                                     timeout=_SHORT_TIMEOUT)
-        s = re.findall("mShowingLockscreen=(true|false)", output)
-        if s:
-            if s[0] == "true":
-                return True
-            else:
-                return False
+        if s := re.findall("mShowingLockscreen=(true|false)", output):
+            return s[0] == "true"
         else:
             return None
 
@@ -2717,7 +2828,7 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
                                     timeout=_SHORT_TIMEOUT)
         s = re.findall("3-axis Accelerometer.*last=<([- .0-9]*),([- .0-9]*),([- .0-9]*)>", output)
         try:
-            rv = tuple([float(d) for d in s[0]])
+            rv = tuple(float(d) for d in s[0])
         except (IndexError, ValueError):
             rv = (None, None, None)
         return rv
@@ -2733,17 +2844,23 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
         return True
 
     def sendAccelerometerRotation(self, value):
-        if value:
-            sendValue = "i:1"
-        else:
-            sendValue = "i:0"
+        sendValue = "i:1" if value else "i:0"
         try:
-            self._runAdb(["shell", "content", "insert",
-                          "--uri", "content://settings/system",
-                          "--bind", "name:s:accelerometer_rotation",
-                          "--bind", "value:" + sendValue],
-                         expectedExitStatus=0,
-                         timeout=_SHORT_TIMEOUT)
+            self._runAdb(
+                [
+                    "shell",
+                    "content",
+                    "insert",
+                    "--uri",
+                    "content://settings/system",
+                    "--bind",
+                    "name:s:accelerometer_rotation",
+                    "--bind",
+                    f"value:{sendValue}",
+                ],
+                expectedExitStatus=0,
+                timeout=_SHORT_TIMEOUT,
+            )
         except Exception:
             return False
         return True
@@ -2763,23 +2880,32 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
         cmd = ["shell", "log", "-p", priority, "-t", tag, msg]
         status, out, err = self._runAdb(cmd, [0, 124], timeout=_SHORT_TIMEOUT)
         if status == 124:
-            errormsg = "log timeout: %s" % (["adb"] + cmd)
+            errormsg = f'log timeout: {["adb"] + cmd}'
             _adapterLog(errormsg)
             raise FMBTAndroidError(errormsg)
         return True
 
     def sendUserRotation(self, rotation):
         allowedRotations = [ROTATION_0, ROTATION_90, ROTATION_180, ROTATION_270]
-        if not rotation in allowedRotations:
+        if rotation not in allowedRotations:
             raise ValueError("invalid rotation: %s, use one of %s" %
                              (allowedRotations,))
-        sendValue = "i:%s" % (rotation,)
+        sendValue = f"i:{rotation}"
         try:
-            self._runAdb(["shell", "content", "insert",
-                          "--uri", "content://settings/system",
-                          "--bind", "name:s:user_rotation",
-                          "--bind", "value:" + sendValue],
-                         timeout=_SHORT_TIMEOUT)
+            self._runAdb(
+                [
+                    "shell",
+                    "content",
+                    "insert",
+                    "--uri",
+                    "content://settings/system",
+                    "--bind",
+                    "name:s:user_rotation",
+                    "--bind",
+                    f"value:{sendValue}",
+                ],
+                timeout=_SHORT_TIMEOUT,
+            )
         except Exception:
             return False
         return True
@@ -2799,19 +2925,13 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
         _, output, _ = self._runAdb(["shell", "dumpsys", "window"], 0,
                                     timeout=_SHORT_TIMEOUT)
         s = re.findall("BarController.StatusBar\r\n\s*mState=(.*)\r", output)
-        if "WINDOW_STATE_SHOWING" in s:
-            return True
-        else:
-            return False
+        return "WINDOW_STATE_SHOWING" in s
 
     def recvNavigationBarVisible(self):
         _, output, _ = self._runAdb(["shell", "dumpsys", "window"], 0,
                                     timeout=_SHORT_TIMEOUT)
         s = re.findall("BarController.NavigationBar\r\n\s*mState=(.*)\r", output)
-        if "WINDOW_STATE_SHOWING" in s:
-            return True
-        else:
-            return False
+        return "WINDOW_STATE_SHOWING" in s
 
     def recvTopAppWindow(self):
         _, output, _ = self._runAdb(["shell", "dumpsys", "window"], 0,
@@ -2823,36 +2943,36 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
         if s and len(s[-1][-1].strip()) > 1:
             topWindowName = s[-1][-1]
             if len(s) > 0:
-                _adapterLog('recvTopAppWindow warning: several mCurrentFocus windows: "%s"'
-                            % ('", "'.join([w[-1] for w in s]),))
+                _adapterLog(
+                    f"""recvTopAppWindow warning: several mCurrentFocus windows: "{'", "'.join([w[-1] for w in s])}\""""
+                )
         else: topWindowName = None
 
         if self._platformVersion >= "4.2":
             s = re.findall("mFocusedApp=AppWindowToken.*ActivityRecord\{#?[0-9A-Fa-f]*( [^ ]*)? (?P<appName>[^} ]*)[^}]*\}", output)
         else:
             s = re.findall("mFocusedApp=AppWindowToken.*ActivityRecord\{#?[0-9A-Fa-f]*( [^ ]*)? (?P<appName>[^}]*)\}", output)
-        if s and len(s[0][-1].strip()) > 1:
-            topAppName = s[0][-1].strip()
-        else:
-            topAppName = None
+        topAppName = s[0][-1].strip() if s and len(s[0][-1].strip()) > 1 else None
         return topAppName, topWindowName
 
     def recvTopWindowStack(self):
         rv = None
         _, output, _ = self._runAdb(["shell", "dumpsys", "window"], 0,
                                     timeout=_SHORT_TIMEOUT)
-        # Find out top window id.
-        s = re.findall("mTopFullscreenOpaqueWindowState=Window\{(?P<winId>[0-9A-Fa-f]*) ", output)
-        if s:
+        if s := re.findall(
+            "mTopFullscreenOpaqueWindowState=Window\{(?P<winId>[0-9A-Fa-f]*) ",
+            output,
+        ):
             win_id = s[0]
-            # Find out top task id (cannot directly rely on mFocusedApp,
-            # it may be outdated)
-            t = re.findall(r"AppWindowToken\{[0-9A-Fa-f]* token=Token\{[0-9A-Fa-f]* ActivityRecord\{[0-9A-Fa-f]* [^ ]* [^ ]* t(?P<taskId>[0-9]*)\}\}\}:[ \r\n]*windows=\[Window\{%s " % (win_id,), output)
-            if t:
+            if t := re.findall(
+                r"AppWindowToken\{[0-9A-Fa-f]* token=Token\{[0-9A-Fa-f]* ActivityRecord\{[0-9A-Fa-f]* [^ ]* [^ ]* t(?P<taskId>[0-9]*)\}\}\}:[ \r\n]*windows=\[Window\{%s "
+                % (win_id,),
+                output,
+            ):
                 task_id = t[0]
-                # Find window stack of the task
-                stack_line = re.findall(r"(\{taskId=%s appTokens=\[.*)" % (task_id,), output)
-                if stack_line:
+                if stack_line := re.findall(
+                    r"(\{taskId=%s appTokens=\[.*)" % (task_id,), output
+                ):
                     # Find names of windows on the stack
                     rv = re.findall(r"ActivityRecord\{[0-9A-Fa-f]* [^ ]* ([^ ]*) t%s\}" % (task_id,), stack_line[0])
         return rv
@@ -2860,7 +2980,9 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
     def sendMonkeyScript(self, eventLines):
         monkey_script = "type= raw events\ncount= %s\nspeed= 1.0\nstart data >>\n%s" % (
             len(eventLines.splitlines()), eventLines)
-        remote_filename = "/sdcard/fmbtandroid.%s.monkey_script" % (fmbt.formatTime("%s.%f"),)
+        remote_filename = (
+            f'/sdcard/fmbtandroid.{fmbt.formatTime("%s.%f")}.monkey_script'
+        )
         cmd = ["shell", "echo \"" + monkey_script + "\" > " + remote_filename
                + "; monkey -f" + remote_filename + " 1 ; rm -f " +
                remote_filename]
@@ -2869,9 +2991,9 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
     def sendMonkeyPinchZoom(self,
                   pt1XStart, pt1YStart, pt1XEnd, pt1YEnd,
                   pt2XStart, pt2YStart, pt2XEnd, pt2YEnd, count):
-        self.sendMonkeyScript("capturePinchZoom(%s,%s,%s,%s, %s,%s,%s,%s, %s)" % (
-                  pt1XStart, pt1YStart, pt1XEnd, pt1YEnd,
-                  pt2XStart, pt2YStart, pt2XEnd, pt2YEnd, count))
+        self.sendMonkeyScript(
+            f"capturePinchZoom({pt1XStart},{pt1YStart},{pt1XEnd},{pt1YEnd}, {pt2XStart},{pt2YStart},{pt2XEnd},{pt2YEnd}, {count})"
+        )
 
     def sendSwipe(self, x1, y1, x2, y2):
         _x1, _y1 = self._screenToDisplay(x1, y1)
@@ -2884,60 +3006,58 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
 
     def sendTap(self, xCoord, yCoord):
         xCoord, yCoord = self._screenToDisplay(xCoord, yCoord)
-        return self._monkeyCommand("tap " + str(xCoord) + " " + str(yCoord))[0]
+        return self._monkeyCommand(f"tap {str(xCoord)} {str(yCoord)}")[0]
 
     def sendKeyUp(self, key, modifiers=[]):
-        rv = self._monkeyCommand("key up " + key)[0]
+        rv = self._monkeyCommand(f"key up {key}")[0]
         for m in reversed(modifiers):
-            rv &= self._monkeyCommand("key up " + m)[0]
+            rv &= self._monkeyCommand(f"key up {m}")[0]
         return rv
 
     def sendKeyDown(self, key, modifiers=[]):
         rv = True
         for m in modifiers:
-            rv &= self._monkeyCommand("key down " + m)[0]
-        rv &= self._monkeyCommand("key down " + key)[0]
+            rv &= self._monkeyCommand(f"key down {m}")[0]
+        rv &= self._monkeyCommand(f"key down {key}")[0]
         return rv
 
     def sendTouchUp(self, xCoord, yCoord):
         xCoord, yCoord = self._screenToDisplay(xCoord, yCoord)
-        return self._monkeyCommand("touch up " + str(xCoord) + " " + str(yCoord))[0]
+        return self._monkeyCommand(f"touch up {str(xCoord)} {str(yCoord)}")[0]
 
     def sendTouchDown(self, xCoord, yCoord):
         xCoord, yCoord = self._screenToDisplay(xCoord, yCoord)
-        return self._monkeyCommand("touch down " + str(xCoord) + " " + str(yCoord))[0]
+        return self._monkeyCommand(f"touch down {str(xCoord)} {str(yCoord)}")[0]
 
     def sendTouchMove(self, xCoord, yCoord):
         xCoord, yCoord = self._screenToDisplay(xCoord, yCoord)
-        return self._monkeyCommand("touch move " + str(xCoord) + " " + str(yCoord))[0]
+        return self._monkeyCommand(f"touch move {str(xCoord)} {str(yCoord)}")[0]
 
     def sendTrackBallMove(self, dx, dy):
         dx, dy = self._screenToDisplay(dx, dy)
-        return self._monkeyCommand("trackball " + str(dx) + " " + str(dy))[0]
+        return self._monkeyCommand(f"trackball {str(dx)} {str(dy)}")[0]
 
     def sendPress(self, key, modifiers=[]):
         if not modifiers:
-            return self._monkeyCommand("press " + key)[0]
-        else:
-            rv = True
-            for m in modifiers:
-                rv &= self.sendKeyDown(m)
-            # A press with modifiers must be sent using "key down" and "key up"
-            # primitives, not with "press".
-            rv &= self.sendKeyDown(key)
-            rv &= self.sendKeyUp(key)
-            for m in reversed(modifiers):
-                rv &= self.sendKeyUp(m)
-            return rv
+            return self._monkeyCommand(f"press {key}")[0]
+        rv = True
+        for m in modifiers:
+            rv &= self.sendKeyDown(m)
+        # A press with modifiers must be sent using "key down" and "key up"
+        # primitives, not with "press".
+        rv &= self.sendKeyDown(key)
+        rv &= self.sendKeyUp(key)
+        for m in reversed(modifiers):
+            rv &= self.sendKeyUp(m)
+        return rv
 
     def sendType(self, text):
         for lineIndex, line in enumerate(text.split('\n')):
             if lineIndex > 0: self.sendPress("KEYCODE_ENTER")
             for wordIndex, word in enumerate(line.split(' ')):
                 if wordIndex > 0: self.sendPress("KEYCODE_SPACE")
-                if len(word) > 0 and not self._monkeyCommand("type " + word)[0]:
-                    _adapterLog('sendType("%s") failed when sending word "%s"' %
-                                (text, word))
+                if len(word) > 0 and not self._monkeyCommand(f"type {word}")[0]:
+                    _adapterLog(f'sendType("{text}") failed when sending word "{word}"')
                     return False
         return True
 
@@ -2973,8 +3093,8 @@ class _AndroidDeviceConnection(fmbtgti.GUITestConnection):
                           Example: setScreencapFormat((8, "RGBA"))
         """
         if isinstance(fmt, basestring):
-            if not fmt.lower() in ("png", "raw"):
-                raise ValueError('invalid format "%s"' % (fmt,))
+            if fmt.lower() not in ("png", "raw"):
+                raise ValueError(f'invalid format "{fmt}"')
             self._screencapFormat = fmt.lower()
         else:
             self._screencapFormat = fmt

@@ -52,11 +52,11 @@ host = "127.0.0.1"
 PORTBASE = 0xf4bd
 
 def error(msg, exitstatus=1):
-    sys.stderr.write("fmbt-debug: " + msg + "\n")
+    sys.stderr.write(f"fmbt-debug: {msg}" + "\n")
     sys.exit(exitstatus)
 
 def info(msg):
-    sys.stdout.write("fmbt-debug: " + msg + "\n")
+    sys.stdout.write(f"fmbt-debug: {msg}" + "\n")
     sys.stdout.flush()
 
 if os.name != "nt":
@@ -64,10 +64,7 @@ if os.name != "nt":
         files_with_msg, _, _ = select.select(list_of_files, [], [])
         if files_with_msg:
             f = files_with_msg[0]
-            if hasattr(f, "recv"):
-                msg = f.recv(4096)
-            else:
-                msg = f.readline()
+            msg = f.recv(4096) if hasattr(f, "recv") else f.readline()
         else:
             msg, f = None, None
         return (msg, f)
@@ -89,7 +86,7 @@ else:
 
     def read_input(list_of_files):
         for f in list_of_files:
-            if not f in read_input._files:
+            if f not in read_input._files:
                 read_input._files.add(f)
                 thread.start_new_thread(
                     _read_to_queue, (f, read_input._queue, read_input._files))

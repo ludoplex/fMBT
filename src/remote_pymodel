@@ -41,13 +41,13 @@ def log(msg):
         file(log_filename,"a").write(msg + "\n")
 
 def error(msg):
-    msg = "remote_pymodel error: " + msg + "\n"
+    msg = f"remote_pymodel error: {msg}" + "\n"
     log(msg)
     sys.stderr.write(msg)
     sys.exit(1)
 
 def put(msg):
-    log("sending: '%s'" % (msg,))
+    log(f"sending: '{msg}'")
     sys.stdout.write(str(msg) + "\n")
     sys.stdout.flush()
 
@@ -57,7 +57,7 @@ def put_list(list_of_integers):
 
 def get():
     cmd = sys.stdin.readline()
-    log("got command: '%s'" % (cmd,))
+    log(f"got command: '{cmd}'")
     return cmd
 
 class RemoteModelBridge:

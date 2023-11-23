@@ -152,11 +152,10 @@ class PythonshareConsole(code.InteractiveConsole):
             pass
         self._conn = kwargs.pop("conn")
         self._ns = kwargs.pop("namespace", None)
-        if self._ns == None:
+        if self._ns is None:
             self._ns = conn.namespace()
         code.InteractiveConsole.__init__(self, *args, **kwargs)
-        self.__class__.__name__ = "pythonshare namespace %s at %s" % (
-            self._ns, getattr(self._conn, "hostspec", "N/A"))
+        self.__class__.__name__ = f'pythonshare namespace {self._ns} at {getattr(self._conn, "hostspec", "N/A")}'
         self._codelines = ""
 
     def runsource(self, source, *args):

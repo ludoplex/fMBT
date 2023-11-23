@@ -10,9 +10,7 @@ def d_h1(t, spec_only):  # h1 will be called for speculative parses only
 
 def d_h2(t, spec):
     "h2 : 'a'"
-    if spec:  
-        return dparser.Reject     # don't let h2 match.  If this were not here, a dparser.AmbiguityException exception would result
-    return 2
+    return dparser.Reject if spec else 2
 
 parser = dparser.Parser()
 if parser.parse('a').getStructure() != 1:

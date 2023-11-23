@@ -39,9 +39,9 @@ _g_plugin_dir = os.path.join(os.path.dirname(__file__), "remotedevices_plugins")
 
 def register_device_class(deviceClassInstance):
     _g_device_classes.append(deviceClassInstance)
-    daemon_log("registered: %s from %s" % (
-               deviceClassInstance.__class__.__name__,
-               plugin_name(deviceClassInstance)))
+    daemon_log(
+        f"registered: {deviceClassInstance.__class__.__name__} from {plugin_name(deviceClassInstance)}"
+    )
 
 def plugin_name(device_class):
     return device_class.__class__.__module__.split(".",1)[-1]
@@ -50,20 +50,21 @@ def list_plugins():
     return [plugin_name(dc) for dc in _g_device_classes]
 
 def load_plugin(deviceClassName):
-    __import__("remotedevices_plugins." + deviceClassName)
+    __import__(f"remotedevices_plugins.{deviceClassName}")
 
 def load_all_plugins():
     for p in avail_plugins():
         try:
             load_plugin(p)
         except Exception as e:
-            daemon_log("plugin %s import failed: %s" % (p, e))
+            daemon_log(f"plugin {p} import failed: {e}")
 
 def avail_plugins():
-    plugins = [os.path.basename(f)[:-3]
-               for f in glob.glob(os.path.join(_g_plugin_dir, "*.py"))
-               if not os.path.basename(f).startswith("_")]
-    return plugins
+    return [
+        os.path.basename(f)[:-3]
+        for f in glob.glob(os.path.join(_g_plugin_dir, "*.py"))
+        if not os.path.basename(f).startswith("_")
+    ]
 
 def plugin_dir():
     return _g_plugin_dir
@@ -131,12 +132,14 @@ class Devices(object):
                     deviceIds = dc.rescan()
                 except Exception as e:
                     deviceIds = []
-                    daemon_log('error: rescanning "%s" failed: %s' % (
-                        plugin_name(dc), traceback.format_exc()))
+                    daemon_log(
+                        f'error: rescanning "{plugin_name(dc)}" failed: {traceback.format_exc()}'
+                    )
                 for deviceId in deviceIds:
                     if deviceId in serialNumbers and _g_device_id_class[deviceId] != dc:
-                        daemon_log('warning: rescan collision: found "%s" from "%s" and "%s"' % (
-                            deviceId, plugin_name(dc), plugin_name(_g_device_id_class[deviceId])))
+                        daemon_log(
+                            f'warning: rescan collision: found "{deviceId}" from "{plugin_name(dc)}" and "{plugin_name(_g_device_id_class[deviceId])}"'
+                        )
                     serialNumbers.add(deviceId)
                     _g_device_id_class[deviceId] = dc
             if whitelist:
@@ -147,35 +150,47 @@ class Devices(object):
             # find new devices
             for serialNumber in sorted(serialNumbers):
                 if serialNumber in self._devinfo:
-                    daemon_log('rescan kept "%s"' % (serialNumber,))
+                    daemon_log(f'rescan kept "{serialNumber}"')
                 else:
                     try:
                         self._wolock_add(serialNumber)
-                        daemon_log('rescan found "%s"' % (serialNumber,))
+                        daemon_log(f'rescan found "{serialNumber}"')
                     except Exception as e:
-                        daemon_log('rescan found but failed connecting "%s": %s' % (serialNumber, e))
+                        daemon_log(f'rescan found but failed connecting "{serialNumber}": {e}')
 
             # forget detached devices
             for serialNumber in list(self._devinfo.keys()):
                 if serialNumber not in serialNumbers:
                     self._wolock_remove(serialNumber)
-                    daemon_log('rescan forgot "%s"' % (serialNumber,))
+                    daemon_log(f'rescan forgot "{serialNumber}"')
 
     def match(self, **matchArgs):
         with self._lock:
             return self._wolock_match(**matchArgs)
 
     def _wolock_match(self, **matchArgs):
-        matchingSerials = set([
-            self._infos[i] for i in list(self._infos.keys()) if
-            (not "id" in matchArgs or re.match(matchArgs["id"], i.id)) and
-            (not "type" in matchArgs or re.match(matchArgs["type"], i.type)) and
-            (not "sw" in matchArgs or re.match(matchArgs["sw"], i.sw)) and
-            (not "hw" in matchArgs or re.match(matchArgs["hw"], i.hw)) and
-            (not "display" in matchArgs or re.match(matchArgs["display"], i.display)) and
-            (not "free" in matchArgs or (matchArgs["free"].lower() == str(self.available(self._infos[i])).lower())) and
-            (not "busy" in matchArgs or (matchArgs["busy"].lower() == str(not self.available(self._infos[i])).lower()))])
-        return matchingSerials
+        return {
+            self._infos[i]
+            for i in list(self._infos.keys())
+            if ("id" not in matchArgs or re.match(matchArgs["id"], i.id))
+            and ("type" not in matchArgs or re.match(matchArgs["type"], i.type))
+            and ("sw" not in matchArgs or re.match(matchArgs["sw"], i.sw))
+            and ("hw" not in matchArgs or re.match(matchArgs["hw"], i.hw))
+            and (
+                "display" not in matchArgs
+                or re.match(matchArgs["display"], i.display)
+            )
+            and (
+                "free" not in matchArgs
+                or matchArgs["free"].lower()
+                == str(self.available(self._infos[i])).lower()
+            )
+            and (
+                "busy" not in matchArgs
+                or matchArgs["busy"].lower()
+                == str(not self.available(self._infos[i])).lower()
+            )
+        }
 
     def available(self, key):
         """
@@ -214,15 +229,16 @@ class Devices(object):
               # acquire a device with sw version 4.2, 4.3 or 4.4 that has
               # 480x800 or 720x1280 display.
         """
-        if acquirer == None:
+        if acquirer is None:
             acquirer = ""
         while True:
             with self._lock:
                 matchingSerials = self._wolock_match(**matchArgs)
                 if not matchingSerials:
                     return None
-                matchingAvailable = [s for s in matchingSerials if self.available(s)]
-                if matchingAvailable:
+                if matchingAvailable := [
+                    s for s in matchingSerials if self.available(s)
+                ]:
                     key = random.choice(tuple(matchingAvailable))
                     matchingAvailable.remove(key)
                     self._wolock_acquire(key, acquirer)
@@ -231,7 +247,7 @@ class Devices(object):
                 return None
             daemon_log("acquire blocked")
             time.sleep(1)
-        daemon_log('%s acquired "%s"' % (repr(acquirer), key))
+        daemon_log(f'{repr(acquirer)} acquired "{key}"')
         return key
 
     def info(self, key):
@@ -240,8 +256,8 @@ class Devices(object):
             return dict(self._devinfo[key][1]._asdict())
 
     def _validate(self, key):
-        if not key in self._refcount:
-            raise ValueError('unknown device "%s"' % (key,))
+        if key not in self._refcount:
+            raise ValueError(f'unknown device "{key}"')
 
     def _wolock_acquire(self, key, acquirer=""):
         self._refcount[key] += 1
@@ -256,9 +272,9 @@ class Devices(object):
 
     def _wolock_release(self, key, acquirer=""):
         if self._refcount[key] == 0:
-            raise ValueError('device "%s" not acquired' % (key,))
+            raise ValueError(f'device "{key}" not acquired')
         released_ts = time.time()
-        if acquirer == None:
+        if acquirer is None:
             # automatically find acquirer
             for acqid in self._acquirer:
                 if len(self._acquirer[acqid].get(key, [])) > 0:
@@ -267,7 +283,7 @@ class Devices(object):
         if (acquirer not in self._acquirer or
             key not in self._acquirer[acquirer] or
             len(self._acquirer[acquirer][key]) == 0):
-            raise ValueError('"%s" has not acquired "%s"' % (acquirer, key))
+            raise ValueError(f'"{acquirer}" has not acquired "{key}"')
         self._refcount[key] -= 1
         acquired_ts = self._acquirer[acquirer][key].pop()
         if len(self._acquirer[acquirer][key]) == 0:
@@ -284,8 +300,8 @@ class Devices(object):
 
     def release_all(self, acquirer):
         # release all keys acquired by the acquirer
-        if not acquirer in self._acquirer:
-            raise ValueError('unknown acquirer "%s"' % (acquirer,))
+        if acquirer not in self._acquirer:
+            raise ValueError(f'unknown acquirer "{acquirer}"')
         with self._lock:
             for key in list(self._acquirer[acquirer].keys()):
                 self._wolock_release(key, acquirer)
@@ -294,7 +310,7 @@ class Devices(object):
         if self._refcount[key] > 0:
             return self._devinfo[key][0]
         else:
-            raise ValueError('device "%s" not acquired' % (key,))
+            raise ValueError(f'device "{key}" not acquired')
 
     def acquirers(self):
         return sorted(self._acquirer.keys())
@@ -303,9 +319,10 @@ class Devices(object):
         retval = []
         with self._lock:
             for acquirer in sorted(self._acquirer.keys()):
-                for key in self._acquirer[acquirer]:
-                    timestamps = self._acquirer[acquirer][key]
-                    retval.append((acquirer, key, timestamps))
+                retval.extend(
+                    (acquirer, key, self._acquirer[acquirer][key])
+                    for key in self._acquirer[acquirer]
+                )
         return retval
 
     def _wolock_add(self, serialNumber):
@@ -316,18 +333,18 @@ class Devices(object):
         self._infos[i] = serialNumber
 
     def add(self, serialNumber):
-        if not serialNumber in _g_device_id_class:
-            raise ValueError('device "%s" not found' % (serialNumber,))
+        if serialNumber not in _g_device_id_class:
+            raise ValueError(f'device "{serialNumber}" not found')
 
         with self._lock:
             if serialNumber in blacklist:
-                raise ValueError('device "%s" blacklisted' % (serialNumber,))
+                raise ValueError(f'device "{serialNumber}" blacklisted')
             elif serialNumber in self._refcount:
-                raise ValueError('device "%s" already added' % (serialNumber,))
+                raise ValueError(f'device "{serialNumber}" already added')
             try:
                 self._wolock_add(serialNumber)
             except Exception as e:
-                raise ValueError('error accessing "%s": %s' % (serialNumber, e))
+                raise ValueError(f'error accessing "{serialNumber}": {e}')
 
     def api(self, serialNumber):
         self._validate(serialNumber)
@@ -340,7 +357,7 @@ class Devices(object):
                 doc.append((attr, m.__func__.__code__.co_varnames[1:m.__func__.__code__.co_argcount]))
             elif isinstance(m, types.FunctionType) and not attr.startswith("_"):
                 doc.append((attr, m.__code__.co_varnames[1:m.__code__.co_argcount]))
-        methods = ["%s(%s)" % (m, ", ".join(args)) for m, args in doc]
+        methods = [f'{m}({", ".join(args)})' for m, args in doc]
         return "\n".join(methods)
 
     def _wolock_remove(self, serialNumber):
@@ -353,26 +370,26 @@ class Devices(object):
         del self._devinfo[serialNumber]
         del self._refcount[serialNumber]
         del self._infos[i]
-        daemon_log('removed "%s"' % (serialNumber,))
+        daemon_log(f'removed "{serialNumber}"')
 
     def remove(self, serialNumber, force=False):
         with self._lock:
             self._validate(serialNumber)
             if self._refcount[serialNumber] > 0 and not force:
-                raise ValueError('device "%s" is busy' % (serialNumber,))
+                raise ValueError(f'device "{serialNumber}" is busy')
             self._wolock_remove(serialNumber)
 
     def blacklist_include(self, serialNumber):
         with self._lock:
             if serialNumber in blacklist:
-                raise ValueError('device "%s" already blacklisted' % (serialNumber,))
+                raise ValueError(f'device "{serialNumber}" already blacklisted')
             else:
                 blacklist.append(serialNumber)
 
     def blacklist_exclude(self, serialNumber):
         with self._lock:
-            if not serialNumber in blacklist:
-                raise ValueError('device "%s" not blacklisted' % (serialNumber,))
+            if serialNumber not in blacklist:
+                raise ValueError(f'device "{serialNumber}" not blacklisted')
             blacklist.remove(serialNumber)
 
     def blacklist(self):

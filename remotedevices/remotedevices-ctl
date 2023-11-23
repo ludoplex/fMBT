@@ -144,10 +144,9 @@ def _matchCode(remainder):
         try:
             key, value = match.split("=", 1)
         except ValueError:
-            error('invalid match spec: "%s", use syntax key=value' % (match,))
+            error(f'invalid match spec: "{match}", use syntax key=value')
         matchList.append((key, value))
-    matchCode = ", ".join(["%s=%s" % (k, repr(v)) for k, v in matchList])
-    return matchCode
+    return ", ".join([f"{k}={repr(v)}" for k, v in matchList])
 
 def _arg(args, accept, pickup):
     try:

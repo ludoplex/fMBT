@@ -33,24 +33,20 @@ class Unpicklable(object):
     def __init__(self, obj):
         self._string = str(obj)
     def __str__(self):
-        return 'Unpicklable("%s")' % (self._string,)
+        return f'Unpicklable("{self._string}")'
 
 class Unloadable(object):
     def __init__(self, obj):
         self._string = str(obj)
     def __str__(self):
-        return 'Unloadable("%s")' % (self._string,)
+        return f'Unloadable("{self._string}")'
 
 class Auth_rv(object):
     def __init__(self, success, errormsg=""):
         self.success = success
-        if not errormsg and not success:
-            self.errormsg = "Permission denied"
-        else:
-            self.errormsg = errormsg
+        self.errormsg = errormsg if errormsg or success else "Permission denied"
     def __str__(self):
-        return 'Auth_rv(success=%s, errormsg=%s)' % (
-            repr(self.success), repr(self.errormsg))
+        return f'Auth_rv(success={repr(self.success)}, errormsg={repr(self.errormsg)})'
 
 class Exec(object):
     def __init__(self, namespace, code, expr, lock=True, async_=False, recv_caps=0):
@@ -87,11 +83,9 @@ class Exec_rv(object):
         self.expr_rv = expr_rv
     def __str__(self):
         rv = self.expr_rv
-        if not MSG_STRING_FIELD_MAX_LEN is None and isinstance(rv, str):
+        if MSG_STRING_FIELD_MAX_LEN is not None and isinstance(rv, str):
             if len(rv) > MSG_STRING_FIELD_MAX_LEN:
-                rv = (rv[:MSG_STRING_FIELD_MAX_LEN//2] +
-                      ("...[%s B, CRC %s]..." % (len(rv), crc(rv))) +
-                      rv[-MSG_STRING_FIELD_MAX_LEN//2:])
+                rv = f"{rv[:MSG_STRING_FIELD_MAX_LEN // 2]}...[{len(rv)} B, CRC {crc(rv)}]...{rv[-MSG_STRING_FIELD_MAX_LEN // 2:]}"
         return 'Exec_rv(code_exc="%s", expr_exc="%s", rv=%r)' % (
             self.code_exc, self.expr_exc, rv)
 
@@ -112,52 +106,43 @@ class Async_rv(object):
         self.ns = ns
         self.rvid = rvid
     def __str__(self):
-        return 'Async_rv(ns="%s", rvid="%s")' % (
-            self.ns, self.rvid)
+        return f'Async_rv(ns="{self.ns}", rvid="{self.rvid}")'
 
 class Register_ns(object):
     def __init__(self, ns):
         self.ns = ns
     def __str__(self):
-        return 'Register_ns(ns="%s")' % (
-            self.ns,)
+        return f'Register_ns(ns="{self.ns}")'
 
 class Drop_ns(object):
     def __init__(self, ns):
         self.ns = ns
     def __str__(self):
-        return 'Drop_ns(ns="%s")' % (
-            self.ns,)
+        return f'Drop_ns(ns="{self.ns}")'
 
 class Request_ns(object):
     def __init__(self, ns):
         self.ns = ns
     def __str__(self):
-        return 'Request_ns(ns="%s")' % (
-            self.ns,)
+        return f'Request_ns(ns="{self.ns}")'
 
 class Ns_rv(object):
     def __init__(self, status, errormsg=None):
         self.status = status
         self.errormsg = errormsg
     def __str__(self):
-        return 'Ns_rv(status="%s", errormsg="%s")' % (
-            self.status, errormsg)
+        return f'Ns_rv(status="{self.status}", errormsg="{errormsg}")'
 
 class Server_ctl(object):
     def __init__(self, command, *args):
         self.command = command
         self.args = args
     def __str__(self):
-        return 'Server_ctl(command=%s, args=%s)' % (
-            repr(self.command),
-            repr(self.args))
+        return f'Server_ctl(command={repr(self.command)}, args={repr(self.args)})'
 
 class Server_ctl_rv(object):
     def __init__(self, status, message):
         self.status = status
         self.message = message
     def __str__(self):
-        return 'Server_ctl_rv(status=%s, message=%s)' % (
-            repr(self.status),
-            repr(self.message))
+        return f'Server_ctl_rv(status={repr(self.status)}, message={repr(self.message)})'

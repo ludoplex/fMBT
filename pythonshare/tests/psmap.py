@@ -80,7 +80,7 @@ def use_workers(hub_hostspec):
     g_hubs.append(hub_hostspec)
     conn = pythonshare.connect(hub_hostspec)
     for ns in conn.ls_remote():
-        use_worker(hub_hostspec + "/" + ns)
+        use_worker(f"{hub_hostspec}/{ns}")
 
 def launch_workers(count, hub_port=9999):
     hub_addr = launch_hub(hub_port)
@@ -88,7 +88,7 @@ def launch_workers(count, hub_port=9999):
         launch_worker(worker_id, hub_addr)
 
 def launch_hub(port=9999):
-    hub_addr = "localhost:%s" % (port,)
+    hub_addr = f"localhost:{port}"
     try:
         pythonshare.connect(hub_addr).kill_server()
     except:
@@ -104,7 +104,7 @@ def launch_worker(worker_id, hub_addr):
     namespace = str(worker_id)
     soe(["pythonshare-server", "-p", "stdin", "-n", namespace, "-E", hub_addr],
         bg=True)
-    worker_addr = hub_addr + "/" + namespace
+    worker_addr = f"{hub_addr}/{namespace}"
     use_worker(worker_addr)
 
 def use_worker(worker_hostspec):
@@ -154,24 +154,18 @@ def psmap(func, params_list):
     for worker_conn in g_worker_conns:
         worker_conn.exec_(func_source)
     for job_index, params in enumerate(params_list):
-        if isinstance(params, tuple):
-            params_tuple = params
-        else:
-            params_tuple = (params,)
+        params_tuple = params if isinstance(params, tuple) else (params, )
         eval_jobs.put({
             'conn': None,
             'job_index': job_index,
             'code': func.__name__ + repr(params_tuple)})
-    for params in params_list:
+    for _ in params_list:
         job = eval_results.get()
         results[job['job_index']] = job['result']
     return results
 
 def fib(n):
-    if n <= 1:
-        return 1
-    else:
-        return fib(n-1) + fib(n-2)
+    return 1 if n <= 1 else fib(n-1) + fib(n-2)
 
 if __name__ == "__main__":
     import sys

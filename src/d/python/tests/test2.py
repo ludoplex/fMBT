@@ -3,24 +3,18 @@ from dparser import Parser
 def d_add(t):
     '''add : add '+' mul
            | mul'''
-    if(len(t) == 1):
-        return t[0]
-    return t[0] + t[2]
+    return t[0] if (len(t) == 1) else t[0] + t[2]
 
 def d_mul(t):
     '''mul : mul '*' exp
            | exp'''
-    if(len(t) == 1):
-        return t[0]
-    return t[0]*t[2]
+    return t[0] if (len(t) == 1) else t[0]*t[2]
 
 def d_exp(t):
     '''exp : number1
            | number2
            | '(' add ')' '''
-    if(len(t) == 1):
-        return int(t[0])
-    return t[1]
+    return int(t[0]) if (len(t) == 1) else t[1]
 
 def d_number1(t):
     '''number1 : number'''

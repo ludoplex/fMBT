@@ -26,10 +26,10 @@ def addStep(keyword, args, name):
     """ Add test step to robot test object and robot file"""
     if args:
         test.keywords.create(keyword, args=args.split("\t"))
-        robotfile.append("  " + keyword + "  " + args.replace("\t", "  "))
+        robotfile.append(f"  {keyword}  " + args.replace("\t", "  "))
     else:
         test.keywords.create(keyword)
-        robotfile.append("  " + keyword)
+        robotfile.append(f"  {keyword}")
 
 def run():
     """ Run generated test case.

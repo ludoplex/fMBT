@@ -133,7 +133,7 @@ if __name__ == "__main__":
         error(e)
 
     if len(remainder) > 0:
-        error('unknown arguments: "%s"' % ('", "'.join(remainder)))
+        error(f"""unknown arguments: "{'", "'.join(remainder)}\"""")
 
     for opt, arg in opts:
         if opt in ["-d", "--debug"]:
@@ -142,24 +142,24 @@ if __name__ == "__main__":
             try:
                 opt_debug_limit = int(arg)
             except ValueError:
-                error('invalid debug message length: "%s"' % (arg,))
+                error(f'invalid debug message length: "{arg}"')
         elif opt in ["-h", "--help"]:
             print (__doc__)
             sys.exit(0)
         elif opt in ["-n", "--namespace"]:
             opt_namespace = arg
         elif opt in ["-E", "--export-to"]:
-            if opt_namespace == None:
+            if opt_namespace is None:
                 error('undefined namespace for exporting to %s, '
                       'give --namespace first' % (arg))
             opt_init_import_export.append(["export", opt_namespace, arg])
         elif opt in ["-I", "--import-from"]:
-            if opt_namespace == None:
+            if opt_namespace is None:
                 error('undefined namespace for import from %s, '
                       'give --namespace first' % (arg))
             opt_init_import_export.append(["import", opt_namespace, arg])
         elif opt in ["-i", "--init"]:
-            if opt_namespace == None:
+            if opt_namespace is None:
                 error('undefined namespace for init, give --namespace first')
             opt_init_import_export.append(["init", opt_namespace, arg])
         elif opt in ["-w", "--whitelist-local"]:
@@ -169,7 +169,7 @@ if __name__ == "__main__":
             try:
                 log_file = open(arg, "w")
             except IOError as e:
-                error('cannot open log file "%s" for writing. (%s)' % (arg, e))
+                error(f'cannot open log file "{arg}" for writing. ({e})')
             opt_log_fd = log_file.fileno()
         elif opt in ["-p", "--port"]:
             try:
@@ -178,23 +178,20 @@ if __name__ == "__main__":
                 if arg == "stdin":
                     opt_bind_port = "stdin"
                 else:
-                    error('invalid port "%s", integer or "stdin" expected.' % (arg,))
+                    error(f'invalid port "{arg}", integer or "stdin" expected.')
         elif opt in ["--password"]:
             password_type, password = _parse_password(arg)
-            opt_conn_opts["password." + password_type] = password
+            opt_conn_opts[f"password.{password_type}"] = password
         elif opt in ["--password-file"]:
             try:
                 password_type, password = _parse_password(open(arg).read().strip())
             except IOError as err:
-                error('error reading password file "%s": %s' % (arg, err))
-            opt_conn_opts["password." + password_type] = password
+                error(f'error reading password file "{arg}": {err}')
+            opt_conn_opts[f"password.{password_type}"] = password
         elif opt in ["--interface"]:
-            if arg == "all":
-                opt_bind_host = ""
-            else:
-                opt_bind_host=arg
+            opt_bind_host = "" if arg == "all" else arg
         else:
-            error('no behaviour specified for: "%s"' % (opt,))
+            error(f'no behaviour specified for: "{opt}"')
 
     # Validate arguments
     if opt_bind_host == "":

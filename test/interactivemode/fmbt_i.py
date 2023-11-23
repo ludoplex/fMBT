@@ -61,8 +61,7 @@ def _run_command(cmd, delay_before_output = ui_response_time):
 def iStartGoodFmbt():
     global fmbt
     global fmbt_output
-    fmbt = pexpect.spawn(FMBT_BINARY + ' -L' + FMBT_LOGFILE
-                         + ' -i test.conf')
+    fmbt = pexpect.spawn(f'{FMBT_BINARY} -L{FMBT_LOGFILE} -i test.conf')
     def output_reader():
         s = ""
         while 1:
@@ -80,7 +79,9 @@ def iStartGoodFmbt():
 def iReadAllActionsInAdapter():
     global fmbt
     global all_actions
-    p = subprocess.Popen(FMBT_BINARY + ' -i -E test.conf >preprocessed.txt 2>&1', shell=True)
+    p = subprocess.Popen(
+        f'{FMBT_BINARY} -i -E test.conf >preprocessed.txt 2>&1', shell=True
+    )
     process_response_time()
     assert _debug(p.poll())==0, "Incorrect fmbt exit value or fmbt not exited"
 
@@ -96,14 +97,16 @@ def iReadAllActionsInAdapter():
                       if f.startswith('i') and type(globals()[f]) == types.FunctionType]
     _debug(all_actions)
     for f in action_functions:
-        assert f in all_actions, "Action '%s' not in -E output." % (f,)
+        assert f in all_actions, f"Action '{f}' not in -E output."
     return True
 
 def iQuit():
     _run_command('q', process_response_time)
-    _debug('reading ' + FMBT_LOGFILE)
+    _debug(f'reading {FMBT_LOGFILE}')
     last_log_line = file(FMBT_LOGFILE).readlines()[-1].strip()
-    assert _debug(last_log_line) == '</fmbt_log>', "Log unfinished (%s)" % (last_log_line,)
+    assert (
+        _debug(last_log_line) == '</fmbt_log>'
+    ), f"Log unfinished ({last_log_line})"
     assert _debug(fmbt.isalive()) == False, "Process still alive"
     os.remove(FMBT_LOGFILE)
     return True
@@ -136,21 +139,24 @@ def _find_action_cmd(list_cmd, action):
     return the command which executes the action from the list that is
     printed using list_cmd.
     """
-    action_cmd = ''
-    for row in _run_command(list_cmd):
-        if action in row:
-            action_cmd = row.split(':')[0]
-            break
-    assert action_cmd != '', "Action '%s' not found in output of '%s'" % (action, list_cmd)
+    action_cmd = next(
+        (row.split(':')[0] for row in _run_command(list_cmd) if action in row),
+        '',
+    )
+    assert (
+        action_cmd != ''
+    ), f"Action '{action}' not found in output of '{list_cmd}'"
     return action_cmd
 
 def _validateExecOutput(output, executedAction, adapterResult, modelResult, nextActions = []):
-    expected_output = ["executing: " + executedAction,
-                       "adapter:   " + adapterResult,
-                       "model:     " + modelResult]
+    expected_output = [
+        f"executing: {executedAction}",
+        f"adapter:   {adapterResult}",
+        f"model:     {modelResult}",
+    ]
     expected_output.extend(nextActions)
     expected_output.append(PROMPT)
-    _debug('observed: ' + str(output) + '\nrequired: ' + str(expected_output))
+    _debug(f'observed: {str(output)}' + '\nrequired: ' + str(expected_output))
     assert output == expected_output, "Validating exec result failed."
 
 def iListActionsAtState():

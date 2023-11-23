@@ -124,9 +124,10 @@ class ChromiumOSConnection(fmbtgti.GUITestConnection):
             t.add(os.path.join(localDir, filename), arcname=filename)
         t.close()
         package.seek(0)
-        _run(self._loginTuple +
-             ("mkdir -p %s; tar x -C %s" % (destDir, destDir),),
-             package.read())
+        _run(
+            (self._loginTuple + (f"mkdir -p {destDir}; tar x -C {destDir}",)),
+            package.read(),
+        )
 
     def agentExec(self, pythonCode):
         self._agent.exec_in(self._agent_ns, pythonCode)
@@ -210,60 +211,59 @@ class ChromiumOSConnection(fmbtgti.GUITestConnection):
         return True
 
     def sendType(self, text):
-        return self.agentEval('x.sendType(%s)' % (repr(text),))
+        return self.agentEval(f'x.sendType({repr(text)})')
 
     def sendPress(self, keyCode, modifiers=None):
-        if modifiers != None:
+        if modifiers is None:
+            return self.agentEval(f"x.sendPress({repr(keyCode)})")
+        else:
             raise NotImplementedError
-        return self.agentEval("x.sendPress(%s)" % (repr(keyCode),))
 
     def sendKeyDown(self, keyCode, modifiers=None):
-        if modifiers != None:
+        if modifiers is None:
+            return self.agentEval(f"x.sendKeyDown({repr(keyCode)})")
+        else:
             raise NotImplementedError
-        return self.agentEval("x.sendKeyDown(%s)" % (repr(keyCode),))
 
     def sendKeyUp(self, keyCode, modifiers=None):
-        if modifiers != None:
+        if modifiers is None:
+            return self.agentEval(f"x.sendKeyUp({repr(keyCode)})")
+        else:
             raise NotImplementedError
-        return self.agentEval("x.sendKeyUp(%s)" % (repr(keyCode),))
 
     def sendTap(self, x, y, button=None):
-        if button == None:
+        if button is None:
             # TODO: synthesize touch display event, if available
-            command = "x.sendTap(%s, %s)" % (x, y)
+            command = f"x.sendTap({x}, {y})"
         else:
-            command = "x.sendTap(%s, %s, %s)" % (x, y, button)
+            command = f"x.sendTap({x}, {y}, {button})"
         return self.agentEval(command)
 
     def sendTouchDown(self, x, y, button=None):
-        if button == None:
+        if button is None:
             # TODO: synthesize touch display event, if available
-            command = "x.sendTouchDown(%s, %s)" % (x, y)
+            command = f"x.sendTouchDown({x}, {y})"
         else:
-            command = "x.sendTouchDown(%s, %s, %s)" % (x, y, button)
+            command = f"x.sendTouchDown({x}, {y}, {button})"
         return self.agentEval(command)
 
     def sendTouchMove(self, x, y, button=None):
-        if button == None:
             # TODO: synthesize touch display event, if available
-            command = "x.sendTouchMove(%s, %s)" % (x, y)
-        else:
-            command = "x.sendTouchMove(%s, %s)" % (x, y)
+        command = f"x.sendTouchMove({x}, {y})"
         return self.agentEval(command)
 
     def sendTouchUp(self, x, y, button=None):
-        if button == None:
+        if button is None:
             # TODO: synthesize touch display event, if available
-            command = "x.sendTouchUp(%s, %s)" % (x, y)
+            command = f"x.sendTouchUp({x}, {y})"
         else:
-            command = "x.sendMouseUp(%s, %s, %s)" % (x, y, button)
+            command = f"x.sendMouseUp({x}, {y}, {button})"
         return self.agentEval(command)
 
     def shellSOE(self, shellCommand, username, asyncStatus, asyncOut, asyncError, usePty):
         _, (s, o, e) = self.agentEval(
-            "fmbtx11_conn.shellSOE(%s, %s, %s, %s, %s, %s)" % (
-                repr(shellCommand), repr(username), repr(asyncStatus),
-                repr(asyncOut), repr(asyncError), repr(usePty)))
+            f"fmbtx11_conn.shellSOE({repr(shellCommand)}, {repr(username)}, {repr(asyncStatus)}, {repr(asyncOut)}, {repr(asyncError)}, {repr(usePty)})"
+        )
 
         return s, o, e
 

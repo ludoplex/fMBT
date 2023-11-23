@@ -64,7 +64,7 @@ import tempfile
 import textwrap
 
 def error(msg, exitstatus=1):
-    sys.stderr.write("fmbt-view: " + msg + "\n")
+    sys.stderr.write(f"fmbt-view: {msg}" + "\n")
     sys.exit(exitstatus)
 
 def cmd_output(*args, **kwargs):

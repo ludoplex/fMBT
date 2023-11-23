@@ -137,7 +137,7 @@ class _USE_DEFAULTS:
     pass
 
 def _fmbtLog(msg):
-    fmbt.fmbtlog("fmbtgti: %s" % (msg,))
+    fmbt.fmbtlog(f"fmbtgti: {msg}")
 
 def _filenameTimestamp(t=None):
     return fmbt.formatTime("%Y%m%d-%H%M%S-%f", t)
@@ -177,13 +177,9 @@ def _takeArgs(argNames, d, thatsAll=False):
     If thatsAll is True, require that all arguments have been
     consumed.
     """
-    retval = {}
-    for a in argNames:
-        if a in d:
-            retval[a] = d.pop(a, None)
+    retval = {a: d.pop(a, None) for a in argNames if a in d}
     if thatsAll and len(d) > 0:
-        raise TypeError('Unknown argument(s): "%s"' %
-                        ('", "'.join(sorted(d.keys()))))
+        raise TypeError(f"""Unknown argument(s): "{'", "'.join(sorted(d.keys()))}\"""")
     return retval, d
 
 def _convert(srcFile, convertArgs, dstFile):
@@ -196,7 +192,11 @@ def _convert(srcFile, convertArgs, dstFile):
     subprocess.call([fmbt_config.imagemagick_convert, srcFile] + convertArgs + [dstFile])
 
 def _ppFilename(origFilename, preprocess):
-    return origFilename + ".fmbtoir.cache." + re.sub("[^a-zA-Z0-9.]", "", preprocess) + ".png"
+    return (
+        f"{origFilename}.fmbtoir.cache."
+        + re.sub("[^a-zA-Z0-9.]", "", preprocess)
+        + ".png"
+    )
 
 def _intCoords((x, y), (width, height)):
     if 0 <= x <= 1 and type(x) == float: x = x * width
@@ -250,9 +250,7 @@ class _Rgb888(ctypes.Structure):
 _libpath = ["", ".",
             os.path.dirname(os.path.abspath(__file__)),
             distutils.sysconfig.get_python_lib(plat_specific=1)]
-_suffix = ".so"
-if os.name == "nt":
-    _suffix = ".dll"
+_suffix = ".dll" if os.name == "nt" else ".so"
 for _dirname in _libpath:
     try:
         eye4graphics = ctypes.CDLL(os.path.join(_dirname , "eye4graphics"+_suffix))
@@ -293,15 +291,14 @@ for _dirname in _libpath:
 else:
     class Eye4graphics_lazyimporterror(object):
         def __getattribute__(self, name):
-            raise ImportError("%s cannot load eye4graphics%s" % (__file__, _suffix))
+            raise ImportError(f"{__file__} cannot load eye4graphics{_suffix}")
     eye4graphics = Eye4graphics_lazyimporterror()
 
 def _e4gOpenImage(filename):
-    image = eye4graphics.openImage(filename)
-    if not image:
-        raise IOError('Cannot open image "%s"' % (filename,))
-    else:
+    if image := eye4graphics.openImage(filename):
         return image
+    else:
+        raise IOError(f'Cannot open image "{filename}"')
 
 def _e4gImageDimensions(e4gImage):
     struct_bbox = _Bbox(0, 0, 0, 0, 0)
@@ -339,7 +336,7 @@ def sortItems(items, criteria):
         area_items.sort()
         return [ai[1] for ai in area_items]
     else:
-        raise ValueError('invalid sort criteria "%s"' % (criteria,))
+        raise ValueError(f'invalid sort criteria "{criteria}"')
 
 class GUITestConnection(object):
     """
@@ -354,9 +351,13 @@ class GUITestConnection(object):
     def sendPress(self, keyName):
         return self.sendKeyDown(keyName) and self.sendKeyUp(keyName)
     def sendKeyDown(self, keyName):
-        raise NotImplementedError('sendKeyDown("%s") needed but not implemented.' % (keyName,))
+        raise NotImplementedError(
+            f'sendKeyDown("{keyName}") needed but not implemented.'
+        )
     def sendKeyUp(self, keyName):
-        raise NotImplementedError('sendKeyUp("%s") needed but not implemented.' % (keyName,))
+        raise NotImplementedError(
+            f'sendKeyUp("{keyName}") needed but not implemented.'
+        )
     def sendTap(self, x, y):
         return self.sendTouchDown(x, y) and self.sendTouchUp(x, y)
     def sendTouchDown(self, x, y):
@@ -366,12 +367,14 @@ class GUITestConnection(object):
     def sendTouchUp(self, x, y):
         raise NotImplementedError('sendTouchUp(%d, %d) needed but not implemented.' % (x, y))
     def sendType(self, text):
-        raise NotImplementedError('sendType("%s") needed but not implemented.' % (text,))
+        raise NotImplementedError(f'sendType("{text}") needed but not implemented.')
     def recvScreenshot(self, filename):
         """
         Saves screenshot from the GUI under test to given filename.
         """
-        raise NotImplementedError('recvScreenshot("%s") needed but not implemented.' % (filename,))
+        raise NotImplementedError(
+            f'recvScreenshot("{filename}") needed but not implemented.'
+        )
     def recvScreenUpdated(self, waitTime, pollDelay):
         """
         Wait until the screen has been updated, but no longer than the
@@ -434,20 +437,19 @@ class SimulatedGUITestConnection(GUITestConnection):
 
     def recvScreenshot(self, filename):
         self._calls.append((time.time(), "recvScreenshot", (filename,), {}))
-        if self._screenshotFilenames:
-            if self._nextScreenshotFilename >= len(self._screenshotFilenames):
-                self._nextScreenshotFilename = 0
-            fakeFilename = self._screenshotFilenames[self._nextScreenshotFilename]
-            self._nextScreenshotFilename += 1
-            if not os.access(fakeFilename, os.R_OK):
-                raise IOError('screenshot file not found: "%s"' % (fakeFilename,))
-            if fakeFilename.lower().endswith(".jpg"):
-                _convert(fakeFilename, [], filename)
-            else:
-                shutil.copy(fakeFilename, filename)
-            return True
-        else:
+        if not self._screenshotFilenames:
             return False
+        if self._nextScreenshotFilename >= len(self._screenshotFilenames):
+            self._nextScreenshotFilename = 0
+        fakeFilename = self._screenshotFilenames[self._nextScreenshotFilename]
+        self._nextScreenshotFilename += 1
+        if not os.access(fakeFilename, os.R_OK):
+            raise IOError(f'screenshot file not found: "{fakeFilename}"')
+        if fakeFilename.lower().endswith(".jpg"):
+            _convert(fakeFilename, [], filename)
+        else:
+            shutil.copy(fakeFilename, filename)
+        return True
 
     def target(self):
         return "SimulatedGUITestConnection"
@@ -489,23 +491,20 @@ class OrEngine(object):
         engineIndexes = []
 
         if isinstance(self, OcrEngine):
-            if not self in _g_ocrEngines:
+            if self not in _g_ocrEngines:
                 _g_ocrEngines.append(self)
             engineIndexes.append(_g_ocrEngines.index(self))
             if defaultOcr:
                 _g_defaultOcrEngine = self
 
         if isinstance(self, OirEngine):
-            if not self in _g_oirEngines:
+            if self not in _g_oirEngines:
                 _g_oirEngines.append(self)
             engineIndexes.append(_g_oirEngines.index(self))
             if defaultOir:
                 _g_defaultOirEngine = self
 
-        if len(engineIndexes) == 1:
-            return engineIndexes[0]
-        else:
-            return engineIndexes
+        return engineIndexes[0] if len(engineIndexes) == 1 else engineIndexes
 
 class OcrEngine(OrEngine):
     """
@@ -607,16 +606,16 @@ class OcrEngine(OrEngine):
                   screenshots. Screenshot-specific defaults override
                   engine default.
         """
-        if screenshot == None:
+        if screenshot is None:
             self._findTextDefaults.update(defaults)
         else:
             ssid = id(screenshot)
-            if not ssid in self._ssFindTextDefaults:
+            if ssid not in self._ssFindTextDefaults:
                 self._ssFindTextDefaults[ssid] = self._findTextDefaults.copy()
             self._ssFindTextDefaults[ssid].update(defaults)
 
     def findTextDefaults(self, screenshot=None):
-        if screenshot == None:
+        if screenshot is None:
             return self._findTextDefaults
         elif id(screenshot) in self._ssFindTextDefaults:
             return self._ssFindTextDefaults[id(screenshot)]
@@ -773,11 +772,16 @@ class _EyenfingerOcrEngine(OcrEngine):
                 continue
         else:
             return []
-        retval = [GUIItem("OCR text (match %.2f)" % (score,),
-                          bbox, self._ss[ssId].filename,
-                          ocrFind=text, ocrFound=matching_text)
-                  for score, matching_text, bbox in score_text_bbox_list]
-        return retval
+        return [
+            GUIItem(
+                "OCR text (match %.2f)" % (score,),
+                bbox,
+                self._ss[ssId].filename,
+                ocrFind=text,
+                ocrFound=matching_text,
+            )
+            for score, matching_text, bbox in score_text_bbox_list
+        ]
 
     def _dumpOcr(self, screenshot, match=None, preprocess=None, area=None, pagesegmodes=None, lang=None, configfile=None):
         ssId = id(screenshot)
@@ -785,28 +789,30 @@ class _EyenfingerOcrEngine(OcrEngine):
         w = []
         for ppfilter in self._ss[ssId].preprocess:
             for word in self._ss[ssId].words[ppfilter]:
-                for appearance, (wid, middle, bbox) in enumerate(self._ss[ssId].words[ppfilter][word]):
+                for wid, middle, bbox in self._ss[ssId].words[ppfilter][word]:
                     (x1, y1, x2, y2) = bbox
                     w.append((word, (x1, y1, x2, y2)))
         return sorted(set(w), key=lambda i:(i[1][1]/8, i[1][0]))
 
     def _assumeOcrResults(self, screenshot, preprocess, area, pagesegmodes, lang, configfile):
         ssId = id(screenshot)
-        if not type(preprocess) in (list, tuple):
+        if type(preprocess) not in (list, tuple):
             preprocess = [preprocess]
 
-        if (self._ss[ssId].words == None
+        if (
+            self._ss[ssId].words is None
             or self._ss[ssId].preprocess != preprocess
             or self._ss[ssId].area != area
             or self._ss[ssId].lang != lang
-            or self._ss[ssId].configfile != configfile):
+            or self._ss[ssId].configfile != configfile
+        ):
             self._ss[ssId].words = {}
             self._ss[ssId].preprocess = preprocess
             self._ss[ssId].area = area
             self._ss[ssId].lang = lang
             self._ss[ssId].configfile = configfile
             for ppfilter in preprocess:
-                pp = ppfilter % { "zoom": "-resize %sx" % (self._ss[ssId].screenSize[0] * 2) }
+                pp = ppfilter % {"zoom": f"-resize {self._ss[ssId].screenSize[0] * 2}x"}
                 try:
                     eyenfinger.iRead(source=self._ss[ssId].filename, ocr=True, preprocess=pp, ocrArea=area, ocrPageSegModes=pagesegmodes, lang=lang, configfile=configfile)
                 except Exception:
@@ -815,11 +821,9 @@ class _EyenfingerOcrEngine(OcrEngine):
                 self._ss[ssId].words[ppfilter] = eyenfinger._g_words
 
 def _defaultOcrEngine():
-    if _g_defaultOcrEngine:
-        return _g_defaultOcrEngine
-    else:
+    if not _g_defaultOcrEngine:
         _EyenfingerOcrEngine().register(defaultOcr=True)
-        return _g_defaultOcrEngine
+    return _g_defaultOcrEngine
 
 class OirEngine(OrEngine):
     """
@@ -926,16 +930,16 @@ class OirEngine(OrEngine):
                   screenshots. Screenshot-specific defaults override
                   engine default.
         """
-        if screenshot == None:
+        if screenshot is None:
             self._findBitmapDefaults.update(defaults)
         else:
             ssid = id(screenshot)
-            if not ssid in self._ssFindBitmapDefaults:
+            if ssid not in self._ssFindBitmapDefaults:
                 self._ssFindBitmapDefaults[ssid] = self._findBitmapDefaults.copy()
             self._ssFindBitmapDefaults[ssid].update(defaults)
 
     def findBitmapDefaults(self, screenshot=None):
-        if screenshot == None:
+        if screenshot is None:
             return self._findBitmapDefaults
         elif id(screenshot) in self._ssFindBitmapDefaults:
             return self._ssFindBitmapDefaults[id(screenshot)]
@@ -1116,7 +1120,7 @@ class _Eye4GraphicsOirEngine(OirEngine):
         self._openedImages[filename] = _e4gOpenImage(filename)
         # make sure size() is available, this can save an extra
         # opening of the screenshot file.
-        if screenshot.size(allowReadingFile=False) == None:
+        if screenshot.size(allowReadingFile=False) is None:
             screenshot.setSize(_e4gImageDimensions(self._openedImages[filename]))
         self._findBitmapCache[filename] = {}
 
@@ -1170,7 +1174,7 @@ class _Eye4GraphicsOirEngine(OirEngine):
         GUIItem is the detected item (GUIItem.bbox() is the box around it),
         and findParams is a dictionary containing the parameters.
         """
-        if not screenshot.filename() in self._findBitmapCache:
+        if screenshot.filename() not in self._findBitmapCache:
             self.addScreenshot(screenshot)
             ssAdded = True
         else:
@@ -1185,9 +1189,9 @@ class _Eye4GraphicsOirEngine(OirEngine):
                                        "scale": scale,
                                        "bitmapPixelSize": pixelSize,
                                        "screenshotPixelSize": pixelSize})
-                    results = self.findBitmap(screenshot, bitmap,
-                                               **findParams)
-                    if results:
+                    if results := self.findBitmap(
+                        screenshot, bitmap, **findParams
+                    ):
                         retval.append((results[0], findParams))
                         if len(retval) == resultCount:
                             return retval
@@ -1214,11 +1218,11 @@ class _Eye4GraphicsOirEngine(OirEngine):
         if preprocess:
             ssFilenamePP = _ppFilename(ssFilename, preprocess)
             bitmapPP = _ppFilename(bitmap, preprocess)
-            if not ssFilenamePP in self._openedImages:
+            if ssFilenamePP not in self._openedImages:
                 _convert(ssFilename, preprocess, ssFilenamePP)
                 screenshotPP = Screenshot(ssFilenamePP)
                 self.addScreenshot(screenshotPP)
-                if not ssFilename in self._openedRelatedScreenshots:
+                if ssFilename not in self._openedRelatedScreenshots:
                     self._openedRelatedScreenshots[ssFilename] = []
                 self._openedRelatedScreenshots[ssFilename].append(screenshotPP)
             _convert(bitmap, preprocess, bitmapPP)
@@ -1275,11 +1279,9 @@ class _Eye4GraphicsOirEngine(OirEngine):
         return self._findBitmapCache[ssFilename][cacheKey]
 
 def _defaultOirEngine():
-    if _g_defaultOirEngine:
-        return _g_defaultOirEngine
-    else:
+    if not _g_defaultOirEngine:
         _Eye4GraphicsOirEngine().register(defaultOir=True)
-        return _g_defaultOirEngine
+    return _g_defaultOirEngine
 
 
 class _OirRc(object):
@@ -1319,17 +1321,13 @@ class _OirRc(object):
                     curdir = value_str
                     self._dir2oirArgsList[curdir] = [{}]
                     if not os.access(curdir, os.X_OK):
-                        _fmbtLog("warning: %s: inaccessible includedir %s" %
-                                 (repr(oirRcFilepath), curdir))
+                        _fmbtLog(f"warning: {repr(oirRcFilepath)}: inaccessible includedir {curdir}")
                 else:
                     try: value = int(value_str)
                     except ValueError:
                         try: value = float(value_str)
                         except ValueError:
-                            if value_str[0] in "([\"'": # tuple, list, string
-                                value = eval(value_str)
-                            else:
-                                value = value_str
+                            value = eval(value_str) if value_str[0] in "([\"'" else value_str
                     self._dir2oirArgsList[curdir][-1][key.strip()] = value
 
     def searchDirs(self):
@@ -1363,17 +1361,14 @@ class _Paths(object):
         for singleDir in path:
             candidate = os.path.join(singleDir, bitmap)
             if not checkReadable or os.access(candidate, os.R_OK):
-                oirRc = _OirRc.load(os.path.dirname(candidate))
-                if oirRc:
+                if oirRc := _OirRc.load(os.path.dirname(candidate)):
                     self._oirAL[candidate] = oirRc.oirArgsList(".")
                 else:
                     self._oirAL[candidate] = [{}]
                 self._oirAL[bitmap] = self._oirAL[candidate]
                 break
             else:
-                # bitmap is not in singleDir, but there might be .fmbtoirrc
-                oirRc = _OirRc.load(os.path.dirname(candidate))
-                if oirRc:
+                if oirRc := _OirRc.load(os.path.dirname(candidate)):
                     for d in oirRc.searchDirs():
                         if d.startswith("/"):
                             candidate = os.path.join(d, os.path.basename(bitmap))
@@ -1385,14 +1380,16 @@ class _Paths(object):
                             break
 
         if checkReadable and not os.access(candidate, os.R_OK):
-            raise ValueError('Bitmap "%s" not readable in bitmapPath %s' % (bitmap, ':'.join(path)))
+            raise ValueError(
+                f"""Bitmap "{bitmap}" not readable in bitmapPath {':'.join(path)}"""
+            )
         self._abspaths[bitmap] = [candidate]
         # check for alternative bitmaps
         try:
             candidate_ext = "." + candidate.rsplit(".", 1)[1]
         except IndexError:
             candidate_ext = ""
-        alt_candidates = glob.glob(candidate + ".alt*" + candidate_ext)
+        alt_candidates = glob.glob(f"{candidate}.alt*{candidate_ext}")
         self._abspaths[bitmap].extend(alt_candidates)
         return self._abspaths[bitmap]
 
@@ -1402,12 +1399,8 @@ class _Paths(object):
         """
         if bitmap in self._oirAL:
             return self._oirAL[bitmap]
-        else:
-            absBitmap = self.abspaths(bitmap)[0]
-            if absBitmap in self._oirAL:
-                return self._oirAL[absBitmap]
-            else:
-                return None
+        absBitmap = self.abspaths(bitmap)[0]
+        return self._oirAL[absBitmap] if absBitmap in self._oirAL else None
 
 
 class GUITestInterface(object):
@@ -1424,21 +1417,19 @@ class GUITestInterface(object):
         self._screenshotRefCount = {} # filename -> Screenshot object ref count
         self._screenshotArchiveMethod = "resize"
 
-        if ocrEngine == None:
+        if ocrEngine is None:
             self.setOcrEngine(_defaultOcrEngine())
+        elif type(ocrEngine) == int:
+            self.setOcrEngine(_g_ocrEngines[ocrEngine])
         else:
-            if type(ocrEngine) == int:
-                self.setOcrEngine(_g_ocrEngines[ocrEngine])
-            else:
-                self.setOcrEngine(ocrEngine)
+            self.setOcrEngine(ocrEngine)
 
-        if oirEngine == None:
+        if oirEngine is None:
             self.setOirEngine(_defaultOirEngine())
+        elif type(oirEngine) == int:
+            self.setOirEngine(_g_oirEngines[oirEngine])
         else:
-            if type(oirEngine) == int:
-                self.setOirEngine(_g_oirEngines[oirEngine])
-            else:
-                self.setOirEngine(oirEngine)
+            self.setOirEngine(oirEngine)
 
         self._screenshotDir = None
         self._screenshotDirDefault = "screenshots"
@@ -1745,8 +1736,7 @@ class GUITestInterface(object):
                 pass
         elif self._screenshotArchiveMethod.startswith("resize"):
             if self._screenshotArchiveMethod == "resize":
-                convertArgs = ["-resize",
-                               "%sx" % (int(self.screenSize()[0]) / 4,)]
+                convertArgs = ["-resize", f"{int(self.screenSize()[0]) / 4}x"]
             else:
                 widthHeight = self._screenshotArchiveMethod.split()[1]
                 convertArgs = ["-resize", widthHeight]
@@ -1801,16 +1791,16 @@ class GUITestInterface(object):
             else:
                 self._lastScreenshot = forcedScreenshot
         elif self._conn: # There is a connection, get new screenshot
-            if self.screenshotDir() == None:
+            if self.screenshotDir() is None:
                 self.setScreenshotDir(self._screenshotDirDefault)
-            if self.screenshotSubdir() == None:
+            if self.screenshotSubdir() is None:
                 self.setScreenshotSubdir(self._screenshotSubdirDefault)
             screenshotFile = self._newScreenshotFilepath()
             if self.existingConnection().recvScreenshot(screenshotFile):
                 # New screenshot successfully received from device
-                if rotate == None:
+                if rotate is None:
                     rotate = self._rotateScreenshot
-                if rotate != None and rotate != 0:
+                if rotate not in [None, 0]:
                     subprocess.call([fmbt_config.imagemagick_convert, screenshotFile, "-rotate", str(rotate), screenshotFile])
                 self._lastScreenshot = Screenshot(
                     screenshotFile=screenshotFile,
@@ -1888,16 +1878,17 @@ class GUITestInterface(object):
         """
         if self._lastScreenshot != None:
             self._screenSize = self._lastScreenshot.size()
-        if self._screenSize == None:
-            if self._lastScreenshot == None:
+        if self._screenSize is None:
+            if self._lastScreenshot is None:
                 try:
                     if self.refreshScreenshot():
                         self._screenSize = self._lastScreenshot.size()
                         self._lastScreenshot = None
                 except Exception:
                     pass
-                if (self._screenSize == None and
-                    hasattr(self.existingConnection(), "recvScreenSize")):
+                if self._screenSize is None and hasattr(
+                    self.existingConnection(), "recvScreenSize"
+                ):
                     self._screenSize = self.existingConnection().recvScreenSize()
             else:
                 self._screenSize = self._lastScreenshot.size()
@@ -1973,11 +1964,13 @@ class GUITestInterface(object):
                   height for an archived screenshot.
                   The default method is "resize".
         """
-        if screenshotArchiveMethod == "remove":
+        if screenshotArchiveMethod in ["remove", "resize"]:
             pass
-        elif screenshotArchiveMethod == "resize":
-            pass
-        elif screenshotArchiveMethod.startswith("resize"):
+        elif (
+            screenshotArchiveMethod != "remove"
+            and screenshotArchiveMethod != "resize"
+            and screenshotArchiveMethod.startswith("resize")
+        ):
             try:
                 w, h = screenshotArchiveMethod.split(" ")[1].split("x")
             except:
@@ -1988,8 +1981,7 @@ class GUITestInterface(object):
                 raise ValueError(
                     "Invalid resize width or height, integer expected")
         else:
-            raise ValueError('Unknown archive method "%s"' %
-                             (screenshotArchiveMethod,))
+            raise ValueError(f'Unknown archive method "{screenshotArchiveMethod}"')
         self._screenshotArchiveMethod = screenshotArchiveMethod
 
     def setScreenshotDir(self, screenshotDir):
@@ -2184,16 +2176,14 @@ class GUITestInterface(object):
                 width, _ = self.screenSize()
                 x += offX * width
             else:
-                raise TypeError('invalid offset %s (int or float expected)' %
-                                (repr(offX),))
+                raise TypeError(f'invalid offset {repr(offX)} (int or float expected)')
             if isinstance(offY, int):
                 y += offY
             elif isinstance(offY, float):
                 _, height = self.screenSize()
                 y += offY * height
             else:
-                raise TypeError('invalid offset %s (int or float expected)' %
-                                (repr(offY),))
+                raise TypeError(f'invalid offset {repr(offY)} (int or float expected)')
             swipeCoords = (x, y)
 
         return self.swipe(swipeCoords, direction, distance, **dragArgs)
@@ -2328,9 +2318,7 @@ class GUITestInterface(object):
         oirArgs, _ = _takeOirArgs(self._lastScreenshot, rest, thatsAll=True)
         oirArgs["limit"] = 1
         items = self._lastScreenshot.findItemsByBitmap(bitmap, **oirArgs)
-        if len(items) == 0:
-            return False
-        return self.tapItem(items[0], **tapArgs)
+        return False if len(items) == 0 else self.tapItem(items[0], **tapArgs)
 
     def tapDefaults(self):
         """
@@ -2387,16 +2375,14 @@ class GUITestInterface(object):
                 width, _ = self.screenSize()
                 x += offX * width
             else:
-                raise TypeError('invalid offset %s (int or float expected)' %
-                                (repr(offX),))
+                raise TypeError(f'invalid offset {repr(offX)} (int or float expected)')
             if isinstance(offY, int):
                 y += offY
             elif isinstance(offY, float):
                 _, height = self.screenSize()
                 y += offY * height
             else:
-                raise TypeError('invalid offset %s (int or float expected)' %
-                                (repr(offY),))
+                raise TypeError(f'invalid offset {repr(offY)} (int or float expected)')
             tapCoords = (x, y)
         return self.tap(tapCoords, **tapArgs)
 
@@ -2561,16 +2547,12 @@ class GUITestInterface(object):
                   ...c:/temp/cmd.async.status contents are in retval...
         """
         startTime = time.time()
-        if waitTime is None:
-            endTime = float("inf")
-        else:
-            endTime = startTime + waitTime
+        endTime = float("inf") if waitTime is None else startTime + waitTime
         now = startTime
         rv = []
         while now <= endTime and not rv:
             for index, func in enumerate(listOfFuncs):
-                retval = func()
-                if retval:
+                if retval := func():
                     rv.append((index, func, retval))
             time.sleep(min(pollDelay, (endTime - now)))
             now = time.time()
@@ -2712,10 +2694,10 @@ class GUITestInterface(object):
         beforeRefresh = waitArgs.get("beforeRefresh", lambda: None)
         afterRefresh = waitArgs.get("afterRefresh", lambda: None)
         updated = self.existingConnection().recvScreenUpdated(waitTime, pollDelay)
-        if updated == None:
+        if updated is None:
             # optimised version is not available, this is a fallback
             previousScreenshot = self.screenshot()
-            if previousScreenshot == None:
+            if previousScreenshot is None:
                 beforeRefresh()
                 self.refreshScreenshot()
                 afterRefresh()
@@ -2731,10 +2713,8 @@ class GUITestInterface(object):
                 **waitArgs)
         elif updated == True:
             self.refreshScreenshot()
-        elif updated == False:
-            pass # no need to fetch the same screen
-        else:
-            raise ValueError("recvScreenUpdated returned illegal value: %s" % (repr(updated),))
+        elif updated != False:
+            raise ValueError(f"recvScreenUpdated returned illegal value: {repr(updated)}")
         return updated
 
 class Screenshot(object):
@@ -2779,7 +2759,7 @@ class Screenshot(object):
         """
         Returns screenshot size in pixels, as pair (width, height).
         """
-        if self._screenSize == None and allowReadingFile:
+        if self._screenSize is None and allowReadingFile:
             e4gImage = _e4gOpenImage(self._filename)
             self._screenSize = _e4gImageDimensions(e4gImage)
             eye4graphics.closeImage(e4gImage)
@@ -2828,31 +2808,30 @@ class Screenshot(object):
 
     def _findFirstMatchingBitmapCandidate(self, bitmap, **oirArgs):
         for candidate in self._paths.abspaths(bitmap):
-            found = self._oirEngine.findBitmap(self, candidate, **oirArgs)
-            if found:
+            if found := self._oirEngine.findBitmap(self, candidate, **oirArgs):
                 return found
         return []
 
     def findItemsByBitmap(self, bitmap, **oirFindArgs):
-        if self._oirEngine != None:
-            self._notifyOirEngine()
-            oirArgsList = self._paths.oirArgsList(bitmap)
-            results = []
-            if oirArgsList:
-                for oirArgs in oirArgsList:
-                    oirArgs, _ = _takeOirArgs(self._oirEngine, oirArgs.copy())
-                    oirArgs.update(oirFindArgs)
-                    results.extend(self._findFirstMatchingBitmapCandidate(
-                        bitmap, **oirArgs))
-                    if results: break
-            else:
-                oirArgs = oirFindArgs
+        if self._oirEngine is None:
+            raise RuntimeError(
+                f'Trying to use OIR on "{self.filename()}" without OIR engine.'
+            )
+        self._notifyOirEngine()
+        oirArgsList = self._paths.oirArgsList(bitmap)
+        results = []
+        if oirArgsList:
+            for oirArgs in oirArgsList:
+                oirArgs, _ = _takeOirArgs(self._oirEngine, oirArgs.copy())
+                oirArgs.update(oirFindArgs)
                 results.extend(self._findFirstMatchingBitmapCandidate(
                     bitmap, **oirArgs))
-            return results
-
+                if results: break
         else:
-            raise RuntimeError('Trying to use OIR on "%s" without OIR engine.' % (self.filename(),))
+            oirArgs = oirFindArgs
+            results.extend(self._findFirstMatchingBitmapCandidate(
+                bitmap, **oirArgs))
+        return results
 
     def findItemsByDiff(self, image, colorMatch=1.0, limit=1, area=None):
         """
@@ -2904,10 +2883,12 @@ class Screenshot(object):
                            bbox.error >> 8 & 0xff,
                            bbox.error & 0xff)
                 foundItems.append(
-                    GUIItem("DIFF %s" %
-                            (rgbDiff,),
-                            (bbox.left, bbox.top, bbox.right, bbox.bottom),
-                            self))
+                    GUIItem(
+                        f"DIFF {rgbDiff}",
+                        (bbox.left, bbox.top, bbox.right, bbox.bottom),
+                        self,
+                    )
+                )
                 limit -= 1
         finally:
             if closeImageA:

@@ -100,7 +100,7 @@ import fmbt_config
 MAXSPEED=100000
 
 def error(msg):
-    sys.stderr.write('fmbt-stats: ' + msg + '\n')
+    sys.stderr.write(f'fmbt-stats: {msg}' + '\n')
     sys.exit(1)
 
 def read_from_log_duration_execaction(testlog_fileobj, include_regexps = []):
@@ -227,9 +227,7 @@ def check_output_format(output_fileobj):
     if '.' in output_fileobj.name: output_file_ext = output_fileobj.name.split('.')[-1].lower()
     else: output_file_ext = ""
 
-    if output_file_ext in ['html', 'csv']: output_file_format = output_file_ext
-    else: output_file_format = 'plot'
-    return output_file_format
+    return output_file_ext if output_file_ext in ['html', 'csv'] else 'plot'
 
 def write_output_file(output_fileobj, data_formatter, data):
     output_file_format = check_output_format(output_fileobj)
@@ -249,24 +247,29 @@ def init_plotting(plot_filename, plot_data_table):
 
     plot_output_format = plot_filename.split('.')[-1] if '.' in plot_filename else plot_filename
     if plot_output_format in ['gif', 'png']:
-        plot_output_format = 'set term ' + plot_output_format + (' size %d,768 10 xffffff' % (plot_opt_width,))
+        plot_output_format = (
+            f'set term {plot_output_format}'
+            + ' size %d,768 10 xffffff' % (plot_opt_width,)
+        )
     elif plot_output_format in ['svg']:
-        plot_output_format = 'set term ' + plot_output_format + (' size %d,768 font "Arial,10"' % (plot_opt_width,))
+        plot_output_format = (
+            f'set term {plot_output_format}'
+            + ' size %d,768 font "Arial,10"' % (plot_opt_width,)
+        )
     elif plot_output_format in ['ps', 'eps']:
         plot_output_format = 'set term postscript landscape "Helvetica" 10'
     elif plot_output_format in ['pdf']:
         plot_output_format = 'set term pdfcairo'
-    output_filename = tempfile.gettempdir() + os.sep + "fmbt-stats.%s.dat" % (os.getpid(),)
+    output_filename = (
+        tempfile.gettempdir() + os.sep + f"fmbt-stats.{os.getpid()}.dat"
+    )
     plot_output_format += '\nset output "%s"' % (plot_filename.replace("\\", "\\\\"),)
 
     file(output_filename, "w").write("".join(plot_data_table))
     return plot_output_format, output_filename
 
 def finish_plotting(plot_datafilename, gnuplot_commands):
-    if not opt_debug:
-        popen_args = {'stderr': subprocess.PIPE}
-    else:
-        popen_args = {}
+    popen_args = {'stderr': subprocess.PIPE} if not opt_debug else {}
     gnuplot_process = subprocess.Popen(["gnuplot"], shell=False,
                                        stdin=subprocess.PIPE,
                                        **popen_args)
@@ -276,23 +279,25 @@ def finish_plotting(plot_datafilename, gnuplot_commands):
 def stats_cov(arg, testlog_fileobj, output_fileobj, plot_filename):
     arg_list = arg.split(",")
     xaxis = arg_list[0]
-    if "all" in arg_list[1:]: print_every_step = True
-    else: print_every_step = False
+    print_every_step = "all" in arg_list[1:]
     if xaxis not in ["time", "steps"]:
-        error('syntax error in coverage arguments "%s", expected "time" or "steps"' % (arg,))
+        error(
+            f'syntax error in coverage arguments "{arg}", expected "time" or "steps"'
+        )
 
     def format_data(out_format, data_cov_xaxis):
-        title = 'Coverage in function of %s' % (xaxis,)
+        title = f'Coverage in function of {xaxis}'
         header_format, datarow_format, footer_format = {}, {}, {}
-        header_format['plot'] = '# ' + title + ('\n# %15s %11s\n' %
-                                                (xaxis, "coverage"))
+        header_format['plot'] = f'# {title}' + '\n# %15s %11s\n' % (
+            xaxis,
+            "coverage",
+        )
         if xaxis == "steps": datarow_format['plot'] = '%17s %11.8f\n'
         else: datarow_format['plot'] = '%17.6f %11.8f\n'
         footer_format['plot'] = ''
 
         header_format['csv'] = '"%s"\n"%s";"coverage"\n' % (title, xaxis)
-        if xaxis == "steps": datarow_format['csv'] = '%s;%s\n'
-        else: datarow_format['csv'] = '%.6f;%s\n'
+        datarow_format['csv'] = '%s;%s\n' if xaxis == "steps" else '%.6f;%s\n'
         footer_format['csv'] = ''
 
         header_format['html'] = '<html><body>\n<h2>%s</h2>\n<table>\n<tr><th>%s</th><th>coverage</th></tr>\n' % (title, xaxis)
@@ -336,8 +341,7 @@ def stats_cov(arg, testlog_fileobj, output_fileobj, plot_filename):
     if plot_filename:
         plot_term, plot_datafilename = init_plotting(plot_filename,
                                                      format_data('plot', data_cov_xaxis))
-        if xaxis == "time": xaxis_label = "Time [s]"
-        else: xaxis_label = "Steps"
+        xaxis_label = "Time [s]" if xaxis == "time" else "Steps"
         gnuplot_commands = """
 set ylabel "Coverage"
 set xlabel "%(xaxis)s"
@@ -362,15 +366,13 @@ def stats_speed(arg, testlog_fileobj, output_fileobj, plot_filename, print_durat
             try:
                 include_regexps.append(r)
             except:
-                error('syntax error in speed include regular expression "%s"'
-                      % (r,))
+                error(f'syntax error in speed include regular expression "{r}"')
         elif a:
             try:
                 averages.append(int(a))
             except ValueError:
-                error('syntax error in speed argument "%s"'
-                      % (a,))
-    if averages == []:
+                error(f'syntax error in speed argument "{a}"')
+    if not averages:
         averages = [1]
 
     if print_duration:
@@ -382,11 +384,21 @@ def stats_speed(arg, testlog_fileobj, output_fileobj, plot_filename, print_durat
         if len(data_speed_columns) == 0: return []
         column_count = len(data_speed_columns[0])
         header_format, datarow_format, footer_format = {}, {}, {}
-        header_format['plot'] = '# ' + title + '\n#' + (' '.join(['%11s' for _ in xrange(column_count)])) + '\n'
+        header_format['plot'] = (
+            f'# {title}'
+            + '\n#'
+            + (' '.join(['%11s' for _ in xrange(column_count)]))
+            + '\n'
+        )
         datarow_format['plot'] = ('%11.3f ' * column_count) + '\n'
         footer_format['plot'] = ''
 
-        header_format['csv'] = '"' + title + '"\n' + ';'.join(['"%s"' for _ in xrange(column_count)]) + '\n'
+        header_format['csv'] = (
+            f'"{title}'
+            + '"\n'
+            + ';'.join(['"%s"' for _ in xrange(column_count)])
+            + '\n'
+        )
         datarow_format['csv'] = ';'.join(['%.3f' for _ in xrange(column_count)]) + '\n'
         footer_format['csv'] = ''
 
@@ -394,7 +406,7 @@ def stats_speed(arg, testlog_fileobj, output_fileobj, plot_filename, print_durat
         datarow_format['html'] = '<tr><td>%s</td></tr>\n' % ('</td><td>'.join(["%.3f" for _ in xrange(column_count)]),)
         footer_format['html'] = '</table></body></html>\n'
 
-        header_row = tuple(["%s step(s)" % (n,) for n in averages])
+        header_row = tuple(f"{n} step(s)" for n in averages)
 
         output_table = [header_format[out_format] % header_row]
         for datarow in data_speed_columns:
@@ -450,11 +462,11 @@ def stats_times(arg, testlog_fileobj, output_fileobj, plot_filename):
     def format_data(out_format, min_med_max_tot_count_aname):
         title = 'Test step execution times'
         header_format, datarow_format, footer_format = {}, {}, {}
-        header_format['plot'] = '# ' + title + '\n#%8s %9s %9s %9s %9s "%s"\n'
+        header_format['plot'] = f'# {title}' + '\n#%8s %9s %9s %9s %9s "%s"\n'
         datarow_format['plot'] = '%9.3f %9.3f %9.3f %9.0f %9s "%s"\n'
         footer_format['plot'] = ''
 
-        header_format['csv'] = '"' + title + '"\n' + '%s;%s;%s;%s;%s;%s\n'
+        header_format['csv'] = f'"{title}' + '"\n' + '%s;%s;%s;%s;%s;%s\n'
         datarow_format['csv'] = '%.3f;%.3f;%.3f;%.0f;%s;"%s"\n'
         footer_format['csv'] = ''
 
@@ -471,9 +483,10 @@ def stats_times(arg, testlog_fileobj, output_fileobj, plot_filename):
         return output_table
 
     possible_args = ['min', 'median', 'max', 'total', 'count', 'name']
-    if not arg in possible_args:
-        error("unknown timer argument: '%s'. Use one of '%s'." %
-              (arg, "', '".join(possible_args)))
+    if arg not in possible_args:
+        error(
+            f"""unknown timer argument: '{arg}'. Use one of '{"', '".join(possible_args)}'."""
+        )
     sort_by_field = possible_args.index(arg)
 
     action_exectimes = {} # map action name to list of exec time durations
@@ -481,7 +494,7 @@ def stats_times(arg, testlog_fileobj, output_fileobj, plot_filename):
     for timestamp, actionname in read_from_log_timestamp_execaction(testlog_fileobj):
         if prev_timestamp != None:
             timedelta = timestamp - prev_timestamp
-            if not prev_actionname in action_exectimes:
+            if prev_actionname not in action_exectimes:
                 action_exectimes[prev_actionname] = []
             action_exectimes[prev_actionname].append(timedelta)
         prev_timestamp = timestamp
@@ -541,11 +554,21 @@ def stats_dist(arg, testlog_fileobj, output_fileobj, plot_filename):
 
         column_count = len(action_columns)
         header_format, datarow_format, footer_format = {}, {}, {}
-        header_format['plot'] = '# ' + title + '\n' + (' '.join(['"%s"' for _ in xrange(column_count)])) + '\n'
+        header_format['plot'] = (
+            f'# {title}'
+            + '\n'
+            + (' '.join(['"%s"' for _ in xrange(column_count)]))
+            + '\n'
+        )
         datarow_format['plot'] = ('%6d ' * column_count) + '"%s"\n'
         footer_format['plot'] = ''
 
-        header_format['csv'] = '"' + title + '"\n' + (';'.join(['"%s"' for _ in xrange(column_count)])) + '\n'
+        header_format['csv'] = (
+            f'"{title}'
+            + '"\n'
+            + (';'.join(['"%s"' for _ in xrange(column_count)]))
+            + '\n'
+        )
         datarow_format['csv'] = ('%d;' * column_count) + '"%s"\n'
         footer_format['csv'] = ''
 
@@ -591,19 +614,17 @@ def stats_dist(arg, testlog_fileobj, output_fileobj, plot_filename):
         prev = executed_actions[0]
         if opt_next:
             for next in executed_actions[1:]:
-                if opt_uniq: data[prev][next] = 1
-                else: data[prev][next] = data[prev].get(next, 0) + 1
+                data[prev][next] = 1 if opt_uniq else data[prev].get(next, 0) + 1
                 prev = next
         elif opt_prev:
             for next in executed_actions[1:]:
-                if opt_uniq: data[next][prev] = 1
-                else: data[next][prev] = data[next].get(prev, 0) + 1
+                data[next][prev] = 1 if opt_uniq else data[next].get(prev, 0) + 1
                 prev = next
         elif opt_simple:
             for act in executed_actions:
                 data[act][act] = data[act].get(act, 0) + 1
         else:
-            error('unknown dist argument "%s".' % (arg,))
+            error(f'unknown dist argument "{arg}".')
 
     write_output_file(output_fileobj, format_data, data)
 
@@ -654,11 +675,21 @@ def stats_tagdist(arg, testlog_fileobj, output_fileobj, plot_filename):
 
         column_count = len(tag_columns)
         header_format, datarow_format, footer_format = {}, {}, {}
-        header_format['plot'] = '# ' + title + '\n' + (' '.join(['"%s"' for _ in xrange(column_count)])) + '\n'
+        header_format['plot'] = (
+            f'# {title}'
+            + '\n'
+            + (' '.join(['"%s"' for _ in xrange(column_count)]))
+            + '\n'
+        )
         datarow_format['plot'] = ('%6d ' * column_count) + '"%s"\n'
         footer_format['plot'] = ''
 
-        header_format['csv'] = '"' + title + '"\n' + (';'.join(['"%s"' for _ in xrange(column_count)])) + '\n'
+        header_format['csv'] = (
+            f'"{title}'
+            + '"\n'
+            + (';'.join(['"%s"' for _ in xrange(column_count)]))
+            + '\n'
+        )
         datarow_format['csv'] = ('%d;' * column_count) + '"%s"\n'
         footer_format['csv'] = ''
 
@@ -677,7 +708,7 @@ def stats_tagdist(arg, testlog_fileobj, output_fileobj, plot_filename):
 
     arg_list = arg.split(",")
     if arg_list[0] not in ['from', 'to']:
-        error('illegal first argument: "%s"' % (arg_list[0],))
+        error(f'illegal first argument: "{arg_list[0]}"')
     opt_next = (arg_list[0] == 'from')
     opt_prev = (arg_list[0] == 'to')
     if not (opt_next or opt_prev): opt_next = True
@@ -687,9 +718,10 @@ def stats_tagdist(arg, testlog_fileobj, output_fileobj, plot_filename):
         if arg_list[1].startswith('tags='):
             regex = arg_list[1].split('=',1)[1]
             try: opt_regex = re.compile(regex)
-            except: error('illegal regular expression "%s".' % (regex,))
+            except:
+                error(f'illegal regular expression "{regex}".')
         else:
-            error('illegal argument "%s".' % (arg_list[1],))
+            error(f'illegal argument "{arg_list[1]}".')
     else:
         opt_regex = re.compile('.*')
 
@@ -705,8 +737,8 @@ def stats_tagdist(arg, testlog_fileobj, output_fileobj, plot_filename):
     all_tags = set()
     for state_tags in tags:
         all_tags.update(state_tags)
-    all_tags = set([t for t in all_tags if opt_regex.match(t)])
-    if len(all_tags) == 0:
+    all_tags = {t for t in all_tags if opt_regex.match(t)}
+    if not all_tags:
         error('No tags.')
 
     data = {}
@@ -716,12 +748,12 @@ def stats_tagdist(arg, testlog_fileobj, output_fileobj, plot_filename):
         if opt_next or opt_prev:
             for index, state_tags in enumerate(tags):
                 for tag in state_tags:
-                    if not tag in all_tags: continue
+                    if tag not in all_tags: continue
                     if index > len(executed_actions) - 1: break
                     next_action = executed_actions[index]
                     data[next_action][tag] = data[next_action].get(tag, 0) + 1
         else:
-            error('unknown dist argument "%s".' % (arg,))
+            error(f'unknown dist argument "{arg}".')
 
     write_output_file(output_fileobj, format_data, data)
 

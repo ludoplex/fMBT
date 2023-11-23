@@ -6,11 +6,10 @@ import fmbt
 
 SILENCE = -3
 
-_g_immutable_types = set(
-    [str, int, long, float, bool, type(None), tuple])
+_g_immutable_types = {str, int, long, float, bool, type(None), tuple}
 
 def setCodeFileLine(c, filename, lineno, funcname=None):
-    if funcname == None:
+    if funcname is None:
         funcname = c.co_name
     return types.CodeType(
         c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags,
@@ -28,14 +27,11 @@ class AALModel:
         self._all_tagnames = self._get_all("name", "tag")
         self._all_tagguards = self._get_all("guard", "tag")
         self._all_tagadapters = self._get_all("adapter", "tag")
-        if len(self._get_all("guard_next_block", "serial")) > 0:
-            self._has_serial = True
-        else:
-            self._has_serial = False
+        self._has_serial = len(self._get_all("guard_next_block", "serial")) > 0
         self._variables = model_globals
         self._variables['action'] = lambda name: self._all_names.index(name) + 1
-        self._variables['output'] = lambda name: self._all_names.index("o:" + name) + 1
-        self._variables['input'] = lambda name: self._all_names.index("i:" + name) + 1
+        self._variables['output'] = lambda name: self._all_names.index(f"o:{name}") + 1
+        self._variables['input'] = lambda name: self._all_names.index(f"i:{name}") + 1
         self._variables['name'] = lambda name: self._all_names.index(name)
         self._variables['variable'] = lambda varname: self._variables[varname]
         self._variables['assign'] = lambda varname, v: self._variables.__setitem__(varname, v)
@@ -55,10 +51,11 @@ class AALModel:
                 if (property_name in ["guard", "body", "adapter"] and
                     itemtype in ["action", "tag"]):
                     self._aal_block_name[itemtype + str(i) + property_name] \
-                        = getattr(self, itemtype + str(i) + "name")
+                            = getattr(self, itemtype + str(i) + "name")
                 elif itemtype == "serial":
-                    self._aal_block_name["serial" + str(i) + "guard"] \
-                        = getattr(self, "serial" + str(i) + "name")
+                    self._aal_block_name[f"serial{str(i)}guard"] = getattr(
+                        self, f"serial{str(i)}name"
+                    )
 
                 plist.append(obj)
             except: return plist
@@ -109,35 +106,36 @@ class AALModel:
 
     def call_exception_handler(self, handler_name, action_name, exc, pass_through_rv=[]):
         rv = self._variables[handler_name](action_name, exc)
-        if rv in pass_through_rv:
+        if rv in pass_through_rv or type(rv) == int:
             return rv
-        elif type(rv) == int:
-            return rv
-        elif rv == None or rv == True:
+        elif rv is None or rv == True:
             return self._variables['action'](action_name)
         else:
-            raise Exception('''Exception handler "%s('%s', %s)" returned unexpected value: %s''' %
-                            (handler_name, action_name, exc, rv))
+            raise Exception(
+                f'''Exception handler "{handler_name}('{action_name}', {exc})" returned unexpected value: {rv}'''
+            )
 
     def call_tagexception_handler(self, handler_name, tag_name, exc):
         rv = self._variables[handler_name](tag_name, exc)
         if type(rv) in [bool, types.NoneType]:
             return rv
         else:
-            raise Exception('''Exception handler "%s('%s', %s)" returned unexpected value: %s''' %
-                            (handler_name, tag_name, exc, rv))
+            raise Exception(
+                f'''Exception handler "{handler_name}('{tag_name}', {exc})" returned unexpected value: {rv}'''
+            )
 
     def reset(self):
         # initialize model
         fmbt._g_actionName = "AAL: initial_state"
         rv = self.call(self.initial_state)
         self._push_variables = [
-            v for v in self.__class__.push_variables_set
-            if (v in self._variables and
-                type(eval(v, self._variables)) not in [
-                    types.ModuleType, types.ClassType] and
-                not eval(v, self._variables) in [self])
-            ]
+            v
+            for v in self.__class__.push_variables_set
+            if v in self._variables
+            and type(eval(v, self._variables))
+            not in [types.ModuleType, types.ClassType]
+            and eval(v, self._variables) not in [self]
+        ]
         return rv
 
     def adapter_init():
@@ -146,10 +144,9 @@ class AALModel:
     def init(self):
         # initialize adapter
         fmbt._g_actionName = "AAL: adapter_init"
-        rv = self.call(self.adapter_init)
-        return rv
+        return self.call(self.adapter_init)
 
-    def adapter_exit(verdict, reason):
+    def adapter_exit(self, reason):
         return
 
     def aexit(self, verdict, reason):
@@ -204,7 +201,7 @@ class AALModel:
         if i in self._enabled_actions_stack[-1] or self.call(self._all_guards[i-1]):
             self.call(self._all_bodies[i-1])
             if self._has_serial:
-                for postfunc in getattr(self, self._all_bodies[i-1].__name__ + "_postcall", []):
+                for postfunc in getattr(self, f"{self._all_bodies[i - 1].__name__}_postcall", []):
                     getattr(self, postfunc)(fmbt._g_actionName)
             if len(self._stack) == 0:
                 fmbt._g_testStep += 1
@@ -240,7 +237,7 @@ class AALModel:
     def getprops(self):
         enabled_tags = []
         for index, guard in enumerate(self._all_tagguards):
-            fmbt._g_actionName = "tag: " + self._all_tagnames[index]
+            fmbt._g_actionName = f"tag: {self._all_tagnames[index]}"
             if self.call(guard): enabled_tags.append(index + 1)
         return enabled_tags
 
@@ -314,7 +311,7 @@ class AALModel:
         Return copy of a state_obj.
         Faster than copy.deepcopy(self.state_obj())
         """
-        if obj == None:
+        if obj is None:
             obj = self.state_obj()
         stack_top, stack_executed_top, stack_enabled_top = obj
         copy_stack_top = {}
@@ -342,12 +339,12 @@ class AALModel:
         Return the current state of the model as a string.
         By comparing strings one can check if the state is already seen.
         """
-        rv_list = []
-        for varname in self._push_variables:
-            if ((include_variables and not varname in include_variables) or
-                (discard_variables and varname in discard_variables)):
-                continue
-            rv_list.append(varname + " = " + repr(self._variables[varname]))
+        rv_list = [
+            f"{varname} = {repr(self._variables[varname])}"
+            for varname in self._push_variables
+            if (not include_variables or varname in include_variables)
+            and (not discard_variables or varname not in discard_variables)
+        ]
         if self._has_serial:
             rv_list.append("!serial = " + str(self._get_all("guard_next_block", "serial")))
         return '\n'.join(rv_list)

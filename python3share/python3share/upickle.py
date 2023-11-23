@@ -55,27 +55,26 @@ def _count(b, bs):
     if size_bit == 0:
         # count 0..15
         count = struct.unpack('b', struct.pack('b', b & 0x0f))[0]
-    else:
-        if val_bits == 0b0000:
-            len_s = bs[:1]
-            data_used = 1
-            count = struct.unpack('B', len_s)[0]
-        elif val_bits == 0b0001:
-            len_s = bs[:2]
-            data_used = 2
-            count = struct.unpack('<H', len_s)[0]
-        elif val_bits == 0b0010:
-            len_s = bs[:3]
-            data_used = 3
-            count = struct.unpack('<I', b'\x00' + len_s)[0] >> 8
-        elif val_bits == 0b0011:
-            len_s = bs[:4]
-            data_used = 4
-            count = struct.unpack('<I', len_s)[0]
-        elif val_bits == 0b0100:
-            len_s = bs[:8]
-            data_used = 8
-            count = struct.unpack('<Q', len_s)[0]
+    elif val_bits == 0b0000:
+        data_used = 1
+        len_s = bs[:1]
+        count = struct.unpack('B', len_s)[0]
+    elif val_bits == 0b0001:
+        len_s = bs[:2]
+        data_used = 2
+        count = struct.unpack('<H', len_s)[0]
+    elif val_bits == 0b0010:
+        len_s = bs[:3]
+        data_used = 3
+        count = struct.unpack('<I', b'\x00' + len_s)[0] >> 8
+    elif val_bits == 0b0011:
+        len_s = bs[:4]
+        data_used = 4
+        count = struct.unpack('<I', len_s)[0]
+    elif val_bits == 0b0100:
+        len_s = bs[:8]
+        data_used = 8
+        count = struct.unpack('<Q', len_s)[0]
     return count, data_used
 
 def dumps(ds):
@@ -204,12 +203,12 @@ def dumps(ds):
         bs.append((type_bits << 5) | (size_bit << 4) | val_bits)
         bs.extend(data_bytes)
         bs.extend(dsb)
-    elif isinstance(ds, set) or isinstance(ds, tuple) or isinstance(ds, list):
+    elif isinstance(ds, (set, tuple, list)):
         if isinstance(ds, set):
             type_bits = 0b100
         elif isinstance(ds, tuple):
             type_bits = 0b101
-        elif isinstance(ds, list):
+        else:
             type_bits = 0b110
         for ds_elt in ds:
             bs.extend(dumps(ds_elt))
@@ -246,12 +245,12 @@ def loads(bs):
         val_bits = b & 0b1111
         if type_bits == 0: # float
             if size_bit == 0: # float
-                if val_bits == 0b1000:
+                if val_bits == 0b1011:
+                    stack.append(-1.0)
+                elif val_bits == 0b1000:
                     stack.append(0.0)
                 elif val_bits == 0b1001:
                     stack.append(1.0)
-                elif val_bits == 0b1011:
-                    stack.append(-1.0)
             else:
                 float_s = bs[i:i+4]
                 i += 4
@@ -290,12 +289,12 @@ def loads(bs):
             i += data_used
             stack.append(bs[i:i+count].decode('utf-8'))
             i += count
-        elif type_bits == 0b100 or type_bits == 0b101 or type_bits == 0b110: # set, tuple, list
+        elif type_bits in [0b100, 0b101, 0b110]: # set, tuple, list
             if type_bits == 0b100:
                 constructor = set
             elif type_bits == 0b101:
                 constructor = tuple
-            elif type_bits == 0b110:
+            else:
                 constructor = list
             count, data_used = _count(b, bs[i:i+8])
             i += data_used

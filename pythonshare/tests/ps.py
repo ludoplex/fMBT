@@ -10,10 +10,10 @@ last_bg_pid = 0
 
 def readlines_to_adapterlog(file_obj, prefix):
     while 1:
-        line = file_obj.readline()
-        if not line:
+        if line := file_obj.readline():
+            fmbt.adapterlog(f"{prefix}{line}")
+        else:
             break
-        fmbt.adapterlog("%s%s" % (prefix, line))
 
 def soe(cmd, stdin="", cwd=None, env=None):
     """Run cmd, return (status, stdout, stderr)"""
@@ -43,7 +43,7 @@ def bg(cmd):
                          stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
-    fmbt.fmbtlog("%s: bg pid %s" % (fmbt.actionName(), p.pid))
-    thread.start_new_thread(readlines_to_adapterlog, (p.stdout, "%s out: " % (p.pid,)))
-    thread.start_new_thread(readlines_to_adapterlog, (p.stderr, "%s err: " % (p.pid,)))
+    fmbt.fmbtlog(f"{fmbt.actionName()}: bg pid {p.pid}")
+    thread.start_new_thread(readlines_to_adapterlog, (p.stdout, f"{p.pid} out: "))
+    thread.start_new_thread(readlines_to_adapterlog, (p.stderr, f"{p.pid} err: "))
     last_bg_pid = p.pid

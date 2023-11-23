@@ -131,8 +131,7 @@ def gdb_read_response(gdb_process, maxlines=-1, timeout=None, read_until_sync=Fa
         if not readable:
             break
         elif err in readable: # prioritize reading stderr over stdout
-            c = err.read(1) # keeps gdb/inferior writing to stderr unblocked
-            if c:
+            if c := err.read(1):
                 if not err_lines: err_lines.append("")
                 err_lines[-1] += c
                 if err_lines[-1][-1] == "\n":
@@ -178,30 +177,22 @@ def gdb_cmd(gdb_process, cmd, timeout=None):
 def gdb_inferior_running(gdb):
     """returns true if and only if debugged process is still alive"""
     gdb_ans = gdb_cmd(gdb, "frame\n", timeout=1)
-    if (len(gdb_ans) <= 1 # only a prompt
-        or "No stack" in "".join(gdb_ans)):
-        return False
-    else:
-        return True
+    return len(gdb_ans) > 1 and "No stack" not in "".join(gdb_ans)
 
 def reader(fileobj, result):
     result.append("")
     current_line = []
-    s = fileobj.read(1)
-    while s:
+    while s := fileobj.read(1):
         if s == "\n":
             result.append("".join(current_line))
             current_line = []
         else:
             current_line.append(s)
-        s = fileobj.read(1)
     result.append(None)
 
 def reader_writer(fileobj, out_fileobj):
-    s = fileobj.read(1)
-    while s:
+    while s := fileobj.read(1):
         out_fileobj.write(s)
-        s = fileobj.read(1)
 
 def parse_array_indices(code):
     """returns expressions with which arrays are indexed in the code"""
@@ -223,7 +214,6 @@ def parse_array_indices(code):
     return indices
 
 def frame_debug_info(gdb):
-    MAX_LINE_LEN = 72
     ret_vars = []
     v_depth = None
     v_file = None
@@ -236,10 +226,7 @@ def frame_debug_info(gdb):
     v_nearby_vars = []
     v_args = [l.strip() for l in gdb_cmd(gdb, 'info args\n')[:-1]
               if not l.startswith("    ")]
-    if "this" in " ".join(v_args):
-        query_local_attributes = True
-    else:
-        query_local_attributes = False
+    query_local_attributes = "this" in " ".join(v_args)
     try:
         frame = [l.strip() for l in gdb_cmd(gdb, 'frame\n')[:-1]]
         v_depth = int(frame[0].split()[0][1:]) # stack frame depth
@@ -254,17 +241,14 @@ def frame_debug_info(gdb):
             v_file = None
             v_line = None
             v_lineno = -1
-        if not v_file is None:
-            if v_file in frame[-1]: # no source code available
-                v_line = None
-            else:
-                v_line = frame[-1]
+        if v_file is not None:
+            v_line = None if v_file in frame[-1] else frame[-1]
     except IndexError:
         v_line = None
         v_func = None
         v_lineno = -1
     if v_line: # source code is available
-        debug('debugging frame at depth %s' % (v_depth,), 2)
+        debug(f'debugging frame at depth {v_depth}', 2)
         v_locals = [l.strip() for l in gdb_cmd(gdb, 'info locals\n')[:-1] if not l.startswith(" ") and  " = " in l]
         v_nearby_vars = []
         # find variables and array references in nearby code
@@ -272,6 +256,7 @@ def frame_debug_info(gdb):
         ss = " ".join(v_nearby_code)
         ss = re.sub(r'[^a-zA-Z0-9_\[\]]', ' ', ss)
         words = ss.split() + parse_array_indices("\n".join(v_nearby_code))
+        MAX_LINE_LEN = 72
         for word in sorted(set(words)):
             try:
                 float(word) # if this is a number, don't print it
@@ -280,30 +265,34 @@ def frame_debug_info(gdb):
                 pass
             res = gdb_cmd(gdb, 'print %s\n' % (word,))
             if res and "=" in res[0]:
-                v_nearby_vars.append(word + " = " + res[0].split("=", 1)[-1].strip()[:MAX_LINE_LEN])
+                v_nearby_vars.append(
+                    f"{word} = "
+                    + res[0].split("=", 1)[-1].strip()[:MAX_LINE_LEN]
+                )
             elif query_local_attributes:
                 res = gdb_cmd(gdb, 'print this.%s\n' % (word,))
                 if res and "=" in res[0]:
-                    v_nearby_vars.append(word + " = " + res[0].split("=", 1)[-1].strip())
+                    v_nearby_vars.append(f"{word} = " + res[0].split("=", 1)[-1].strip())
     return {
         'depth': v_depth,
         'file': v_file,
-        'lineno': int(v_lineno),
+        'lineno': v_lineno,
         'line': v_line,
         'func': v_func,
         'args': v_args,
         'locals': v_locals,
         'nearby_code': v_nearby_code,
-        'nearby_vars': v_nearby_vars}
+        'nearby_vars': v_nearby_vars,
+    }
 
 def source_stack(frames):
     """returns list of strings that contain only source
     lines on frames where available"""
-    rv = []
-    for frame in frames:
-        if frame['line']:
-            rv.append("%(file)s:%(lineno)s\n%(line)s" % frame)
-    return rv
+    return [
+        "%(file)s:%(lineno)s\n%(line)s" % frame
+        for frame in frames
+        if frame['line']
+    ]
 
 _reported_source_stack = set()
 def report_frames(frames):
@@ -315,16 +304,16 @@ def report_frames(frames):
             report.append("called from %(func)s (%(file)s:%(lineno)s)" % frame)
         if frame['line']:
             report.append("    arguments:")
-            report.extend(["        %s" % (arg,) for arg in frame['args']])
+            report.extend([f"        {arg}" for arg in frame['args']])
             report.append("    local variables:")
-            report.extend(["        %s" % (v,) for v in sorted(frame['locals'])])
+            report.extend([f"        {v}" for v in sorted(frame['locals'])])
             if frameno == 0:
                 report.append("    error at line %(lineno)s:" % frame)
             else:
                 report.append("    error inside function called on line %(lineno)s:" % frame)
-            report.extend(["        %s" % (c,) for c in frame['nearby_code']])
+            report.extend([f"        {c}" for c in frame['nearby_code']])
             report.append("    nearby expressions:")
-            report.extend(["        %s" % (v,) for v in frame['nearby_vars']])
+            report.extend([f"        {v}" for v in frame['nearby_vars']])
     _reported_source_stack.add("".join(source_stack(frames)))
     return report
 

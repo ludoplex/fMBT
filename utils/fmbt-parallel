@@ -100,15 +100,15 @@ class LstsList(list,Actionmapper):
         the LSTSs to correspond to the number in the global index."""
         for lsts_number,lsts in list.__iter__(self):
             for act in lsts.get_actionnames():
-                global_actname="%s.%s" % (lsts_number,act)
+                global_actname = f"{lsts_number}.{act}"
                 self.addActionToIndex(global_actname)
 
             a=lsts.get_actionnames()
             new_transitions=[]
-            for i,tranlist in enumerate(lsts.get_transitions()):
+            for tranlist in lsts.get_transitions():
                 new_tranlist=[]
-                for dest_state,act_num in tranlist:
-                    global_actname="%s.%s" % (lsts_number,a[act_num])
+                for dest_state, act_num in tranlist:
+                    global_actname = f"{lsts_number}.{a[act_num]}"
                     new_tranlist.append( (dest_state,self.act2int(global_actname)) )
                 new_transitions.append(new_tranlist)
             lsts.set_transitions(new_transitions)
@@ -127,9 +127,8 @@ class ExtRulesParser:
         lstss = []
         for line in rules_file_contents.split('\n'):
             s = line.strip()
-            m = procrowre.match(s)
-            if not m: continue # line is not a process row
-            lstss.append( (m.group(1),m.group(2)) )
+            if m := procrowre.match(s):
+                lstss.append( (m.group(1),m.group(2)) )
 
         return lstss
 
@@ -155,10 +154,7 @@ class ExtRulesParser:
             s = line.strip()
             m = rulerowre.match(s)
             if not m: continue # this line does not contain a rule
-            rule=[]
-            for lstsnum,actname in syncactre.findall(m.group(1)):
-                # find all actions in the left hand side of "->"
-                rule.append( (lstsnum,actname) )
+            rule = list(syncactre.findall(m.group(1)))
             rule.append(m.group(2))
             allrules.append(rule)
 
@@ -183,7 +179,7 @@ class Rule:
         self.setResult(resulting_act)
 
     def __str__(self):
-        return str(self.__syncacts)+" -> "+str(self.__result)
+        return f"{str(self.__syncacts)} -> {str(self.__result)}"
 
     def setSynchronousActions(self,list_of_acts):
         self.__syncacts=list_of_acts
@@ -205,14 +201,7 @@ class Rule:
         indexes in the pair are global acts. Otherwise False is
         returned."""
 
-        # Types of items in self.__syncacts and list_of_acts is
-        # cruisal here! "(self.__syncacts[i] in list_of_acts)" must
-        # work!
-
-        for req_act in self.__syncacts:
-            if not req_act in list_of_acts:
-                return False
-        return True
+        return all(req_act in list_of_acts for req_act in self.__syncacts)
 
 
 class RuleList(list):
@@ -232,10 +221,7 @@ class Action:
     """
     def __init__(self,actionId,actionName=None):
         self._id = actionId
-        if actionName != None:
-            self._actionName = actionName
-        else:
-            self._actionName = str(self._id)
+        self._actionName = actionName if actionName != None else str(self._id)
 
     def __hash__(self):
         return hash(self._id)
@@ -279,10 +265,14 @@ class model_State:
         """Returns the destination state of the first transition that
         leaves this state and is labelled by the action. If there is
         no such transition, returns None."""
-        for t in self.getOutTransitions():
-            if action.equals( t.getAction() ):
-                return t.getDestState()
-        return None
+        return next(
+            (
+                t.getDestState()
+                for t in self.getOutTransitions()
+                if action.equals(t.getAction())
+            ),
+            None,
+        )
 
     def __eq__(self, other):
         try:
@@ -301,10 +291,7 @@ class StateProp(object):
     """
     def __init__(self,statepropId,statepropName=None):
         self._id = statepropId
-        if statepropName != None:
-            self._statepropName = statepropName
-        else:
-            self._statepropName = str(self._id)
+        self._statepropName = statepropName if statepropName != None else str(self._id)
 
     def __hash__(self):
         return hash(self._id)
@@ -342,7 +329,7 @@ class lstsmodel_State(model_State):
 
     def getOutTransitions(self):
         """Returns list of transitions that leaves the state."""
-        if self._outTransitions==None:
+        if self._outTransitions is None:
             # If the out transitions were not already given, ask the
             # model to calculate them for us
             self._outTransitions=self._model._getOutTransitions(self._id)
@@ -360,13 +347,13 @@ class parallelmodel_State(model_State):
     def __init__(self,globalStateId,outTransitions,parallelmodel=None):
         model_State.__init__(self,globalStateId,outTransitions)
         self._model=parallelmodel
-        self._str_representation=str(tuple([ int(str(s)) for s in self._id ]))
+        self._str_representation = str(tuple(int(str(s)) for s in self._id))
     def __str__(self):
         return self._str_representation
 
     def getOutTransitions(self):
         """Returns list of transitions that leaves the state."""
-        if self._outTransitions==None:
+        if self._outTransitions is None:
             # If the out transitions were not already given, ask the
             # model to calculate them for us
             self._outTransitions=self._model._getOutTransitions(self._id)
@@ -411,7 +398,7 @@ class Transition:
             return False
 
     def __str__(self):
-        return "(%s,%s,%s)" % (self._sourceState,self._action,self._destState)
+        return f"({self._sourceState},{self._action},{self._destState})"
 
     def getAction(self): return self._action
 
@@ -471,8 +458,7 @@ class LstsModel(model_Model):
         self.loadFromObject(lsts_reader)
 
     def getInitialState(self):
-        rv=self._newState(self._lsts.get_header().initial_states)
-        return rv
+        return self._newState(self._lsts.get_header().initial_states)
 
     def getActions(self):
         return [ self._newAction(i) for i,a in enumerate(self._lsts.get_actionnames()) ]
@@ -483,44 +469,41 @@ class LstsModel(model_Model):
     def _newState(self,stateid):
         if stateid in self._stateCache:
             return self._stateCache[stateid]
-        else:
-            s = lstsmodel_State(stateid,None,self)
-            self._stateCache[stateid] = s
-            return s
+        s = lstsmodel_State(stateid,None,self)
+        self._stateCache[stateid] = s
+        return s
 
     def _newAction(self,actionid):
         if actionid in self._actionCache:
             return self._actionCache[actionid]
-        else:
-            a = Action(actionid,self._int2act(actionid))
-            self._actionCache[actionid] = a
-            return a
+        a = Action(actionid,self._int2act(actionid))
+        self._actionCache[actionid] = a
+        return a
 
     def _newStateProp(self,statepropid):
         if statepropid in self._statepropCache:
             return self._statepropCache[statepropid]
-        else:
-            sp = StateProp(statepropid,self._int2sp(statepropid))
-            self._statepropCache[statepropid] = sp
-            return sp
+        sp = StateProp(statepropid,self._int2sp(statepropid))
+        self._statepropCache[statepropid] = sp
+        return sp
 
     def _getOutTransitions(self,state_id):
         """This method is called from a state object."""
-        rv=[]
         outtrans=self._lsts.get_transitions()[ state_id ]
-        for dest,act in outtrans:
-            rv.append(
-                Transition( self._newState(state_id),
-                            self._newAction(act),
-                            self._newState(dest) )
-                )
-        return rv
+        return [
+            Transition(
+                self._newState(state_id),
+                self._newAction(act),
+                self._newState(dest),
+            )
+            for dest, act in outtrans
+        ]
 
     def _getStateProps(self,state_id):
         """Returns the list of state proposition associated to the
         given state, This method is called from a state proposition
         object."""
-        if self._stateprops_by_state == None:
+        if self._stateprops_by_state is None:
             sp_by_st = lsts.props_by_states(self._lsts)
             self._stateprops_by_state = {}
             for st_id in range(len(sp_by_st)):
@@ -560,35 +543,30 @@ class ParallelModel(model_Model):
     def _newState(self,stateid):
         if str(stateid) in self._stateCache:
             return self._stateCache[str(stateid)]
-        else:
-            s = parallelmodel_State(stateid,None,self)
-            self._stateCache[str(stateid)] = s
-            return s
+        s = parallelmodel_State(stateid,None,self)
+        self._stateCache[str(stateid)] = s
+        return s
 
     def _newStateProp(self, submodel_number, submodel_statepropobj):
         # stateprop_id is a pair (modelnumber, stateprop)
         stateprop_id = (submodel_number, submodel_statepropobj)
         if stateprop_id in self._statepropCache:
             return self._statepropCache[stateprop_id]
-        else:
-            sp = StateProp(stateprop_id,
-                           "%s.%s" % (submodel_number, submodel_statepropobj))
-            self._statepropCache[stateprop_id] = sp
-            return sp
+        sp = StateProp(stateprop_id, f"{submodel_number}.{submodel_statepropobj}")
+        self._statepropCache[stateprop_id] = sp
+        return sp
 
     def _newAction(self,actionid):
         if actionid in self._actionCache:
             return self._actionCache[actionid]
-        else:
-            a = Action(actionid,self._actionmapper.int2act(actionid))
-            self._actionCache[actionid] = a
-            return a
+        a = Action(actionid,self._actionmapper.int2act(actionid))
+        self._actionCache[actionid] = a
+        return a
 
     def getStatePropList(self):
         rv = []
         for modelnum, m in enumerate(self._modellist):
-            for sp in m.getStatePropList():
-               rv.append(self._newStateProp(modelnum, sp))
+            rv.extend(self._newStateProp(modelnum, sp) for sp in m.getStatePropList())
         return rv
 
     def _getStateProps(self,state_id):
@@ -605,8 +583,9 @@ class ParallelModel(model_Model):
         elif self._stateprop_semantics == sps_DUMMY:
             return []
         else:
-            raise Exception("Unsupported state proposition semantics: %s"
-                            % (self._stateprop_semantics,))
+            raise Exception(
+                f"Unsupported state proposition semantics: {self._stateprop_semantics}"
+            )
 
     def _getOutTransitions(self,state_id):
         """This method is called from a state object."""
@@ -615,14 +594,15 @@ class ParallelModel(model_Model):
         # 1. Find out the enabled transitions in all component states
         avail_transitions=[]
         for s in state_id: # state_id is a tuple of states
-            avail_transitions.extend([t for t in s.getOutTransitions()])
+            avail_transitions.extend(list(s.getOutTransitions()))
 
         # 2. Find out which rules are enabled when these actions can
         # be executed
         #enabled_rules=self._rulelist.enabled(
         #    [ t.getAction()._id for t in avail_transitions ])
-        enabled_rules=self._rulelist.enabled(
-            set([ t.getAction()._id for t in avail_transitions ]))
+        enabled_rules = self._rulelist.enabled(
+            {t.getAction()._id for t in avail_transitions}
+        )
 
         # 3. Find transitions corresponding to the enabled rules
         source_state=self._newState(state_id)
@@ -631,24 +611,25 @@ class ParallelModel(model_Model):
             dest_states=[()]
             syncacts=rule.getSynchronousActions()
             for state in state_id:
-                ds=[]
-                for t in state.getOutTransitions():
-                    if t.getAction()._id in syncacts:
-                        ds.append(t.getDestState())
-                if ds==[]: ds.append(state)
+                ds = [
+                    t.getDestState()
+                    for t in state.getOutTransitions()
+                    if t.getAction()._id in syncacts
+                ]
+                if not ds: ds.append(state)
                 old_dest_states = dest_states
                 dest_states = []
                 for incomplete_dest_states_tuple in old_dest_states:
-                    for new_ds in ds:
-                        dest_states.append(incomplete_dest_states_tuple + (new_ds,))
-
+                    dest_states.extend(incomplete_dest_states_tuple + (new_ds,) for new_ds in ds)
             # generate new transitions based on dest_states
-            for ds in dest_states:
-                rv.append(
-                    Transition( source_state,
-                                self._newAction( rule.getResult() ),
-                                self._newState(ds) )
-                    )
+            rv.extend(
+                Transition(
+                    source_state,
+                    self._newAction(rule.getResult()),
+                    self._newState(ds),
+                )
+                for ds in dest_states
+            )
         return rv
 
 class ParallelLstsModel(ParallelModel):
@@ -765,9 +746,9 @@ class ConversionModel():
 
 def convert_to_lsts(model, filelike_object):
     action_map = dict()
-    visible_set = set([str(alpha) for alpha in model.getActions()])
+    visible_set = {str(alpha) for alpha in model.getActions()}
     visible_set.discard("tau")
-    action_vec = ["tau"] + [a for a in visible_set]
+    action_vec = ["tau"] + list(visible_set)
     for alpha, idx in zip(action_vec, xrange(len(action_vec))):
         action_map[alpha] = idx
 
@@ -798,7 +779,7 @@ def parse_actions_in_files(list_of_files):
     current_file = None
 
     def add_action(s):
-        if not s in action2filelist:
+        if s not in action2filelist:
             action2filelist[s] = []
         action2filelist[s].append(current_file)
 
@@ -814,7 +795,7 @@ def parse_actions_in_files(list_of_files):
 
     for current_file in list_of_files:
         if not os.access(current_file, os.R_OK):
-            raise IOError("No such file: '%s'" % (current_file,))
+            raise IOError(f"No such file: '{current_file}'")
         fmbtparsers.load(current_file)
 
     return action2filelist

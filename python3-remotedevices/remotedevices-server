@@ -71,6 +71,7 @@ Note: remotedevices.acquireDevice uses the REMOTEDEVICES_SERVER
 environment variable. If it is set, the first parameter is not needed.
 """
 
+
 import getopt
 import subprocess
 import os
@@ -90,11 +91,11 @@ if __name__ == "__main__":
             print(__doc__)
             sys.exit(0)
         elif opt in ['-w', '--whitelist']:
-            serials = "'%s'" % ("','".join(arg.split(",")))
-            whitelist_cmd = ["-i", "whitelist.extend([%s])" % (serials,)]
+            serials = f"""'{"','".join(arg.split(","))}'"""
+            whitelist_cmd = ["-i", f"whitelist.extend([{serials}])"]
         elif opt in ['-b', '--blacklist']:
-            serials = "'%s'" % ("','".join(arg.split(",")))
-            blacklist_cmd = ["-i", "blacklist.extend([%s])" % (serials,)]
+            serials = f"""'{"','".join(arg.split(","))}'"""
+            blacklist_cmd = ["-i", f"blacklist.extend([{serials}])"]
         elif opt in ['--skip-scan']:
             scan_cmd = []
 

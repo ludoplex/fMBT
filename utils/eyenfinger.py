@@ -120,10 +120,10 @@ _g_windowSizes = {None: (0,0)}
 # screenSize is a (width, height) pair.
 _g_screenSize = (0, 0)
 
-_g_tempdir = tempfile.mkdtemp(prefix="eyenfinger.%s." % (os.getpid(),))
+_g_tempdir = tempfile.mkdtemp(prefix=f"eyenfinger.{os.getpid()}.")
 
-SCREENSHOT_FILENAME = _g_tempdir + "/screenshot.png"
-LOG_FILENAME = _g_tempdir + "/eyenfinger.log"
+SCREENSHOT_FILENAME = f"{_g_tempdir}/screenshot.png"
+LOG_FILENAME = f"{_g_tempdir}/eyenfinger.log"
 
 MOUSEEVENT_MOVE, MOUSEEVENT_CLICK, MOUSEEVENT_DOWN, MOUSEEVENT_UP = range(4)
 
@@ -205,7 +205,7 @@ class NoOCRResults(EyenfingerError):
 try:
     import fmbt
     def _log(msg):
-        fmbt.adapterlog("eyenfinger: %s" % (msg,))
+        fmbt.adapterlog(f"eyenfinger: {msg}")
 
 except ImportError:
     def _log(msg):
@@ -256,7 +256,7 @@ def _inputKeyNameToCode(keyName):
     elif keyName in _inputKeyShorthands:
         return _inputKeyNameCodeMap[_inputKeyShorthands[keyName]]
     else:
-        raise ValueError('Invalid key name "%s"' % (keyName,))
+        raise ValueError(f'Invalid key name "{keyName}"')
 
 def error(msg, exitstatus=1):
     sys.stderr.write("eyenfinger: %s\n" % (msg,))
@@ -282,9 +282,10 @@ def printEventsFromFile(filename):
 
 def printEventsFromDevice(deviceName):
     devices = dict(_listInputDevices())
-    if not deviceName in devices:
-        error('Unknown device "%s". Available devices: %s' %
-              (deviceName, sorted(devices.keys())))
+    if deviceName not in devices:
+        error(
+            f'Unknown device "{deviceName}". Available devices: {sorted(devices.keys())}'
+        )
     else:
         printEventsFromFile(devices[deviceName])
 
@@ -300,10 +301,10 @@ def _runcmd(cmd):
     exit_status = p.wait()
     _g_last_runcmd_error = p.stderr.read()
     if exit_status != 0:
-        _log("runcmd: %s" % (cmd,))
-        _log("exit status: " + str(exit_status))
-        _log("stdout: " + output)
-        _log("stderr: " + _g_last_runcmd_error)
+        _log(f"runcmd: {cmd}")
+        _log(f"exit status: {str(exit_status)}")
+        _log(f"stdout: {output}")
+        _log(f"stderr: {_g_last_runcmd_error}")
     else:
         p.stderr.read()
     return exit_status, output
@@ -319,8 +320,11 @@ def _runDrawCmd(inputfilename, cmd, outputfilename):
     # outputfile.delayeddraw.
     delayedCmd = '%s "%s" "%s" "%s"\n' % (
         fmbt_config.imagemagick_convert,
-        outputfilename, '%s' % ('" "'.join(cmd)), outputfilename)
-    delayedDrawFilename = outputfilename + ".delayeddraw"
+        outputfilename,
+        f"""{'" "'.join(cmd)}""",
+        outputfilename,
+    )
+    delayedDrawFilename = f"{outputfilename}.delayeddraw"
     try:
         if os.access(outputfilename, os.R_OK) == False:
                 shutil.copy(inputfilename, outputfilename)
@@ -328,9 +332,9 @@ def _runDrawCmd(inputfilename, cmd, outputfilename):
         else:
             file(delayedDrawFilename, "a").write(delayedCmd)
     except:
-        _log("error on delayed drawing: %s" % (delayedCmd,))
+        _log(f"error on delayed drawing: {delayedCmd}")
         raise
-    _log("delayed drawing: %s" % (delayedCmd,))
+    _log(f"delayed drawing: {delayedCmd}")
     return (0, "")
 
 def _safeForShell(s):
@@ -451,7 +455,7 @@ def windowSize():
     Returns the size of the window as a pair (width, height).
     Choose a window first, for instance with iRead() or iUseWindow().
     """
-    if _g_lastWindow == None:
+    if _g_lastWindow is None:
         raise BadWindowName("undefined window")
     return _g_windowSizes[_g_lastWindow]
 
@@ -461,7 +465,7 @@ def windowXY():
     a pair (x, y).
     Choose a window first, for instance with iRead() or iUseWindow().
     """
-    if _g_lastWindow == None:
+    if _g_lastWindow is None:
         raise BadWindowName("undefined window")
     return _g_windowOffsets[_g_lastWindow]
 
@@ -472,9 +476,7 @@ def imageSize(imageFilename):
     struct_bbox = Bbox(0,0,0,0,0)
     err = eye4graphics.imageDimensions(ctypes.byref(struct_bbox),
                                        imageFilename)
-    if err != 0:
-        return None, None
-    return struct_bbox.right, struct_bbox.bottom
+    return (None, None) if err != 0 else (struct_bbox.right, struct_bbox.bottom)
 
 def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=None, ocrArea=(0, 0, 1.0, 1.0), ocrPageSegModes=(3,), lang="eng", configfile=None):
     """
@@ -530,7 +532,7 @@ def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=N
     _g_readImage = None
     _g_origImage = None
 
-    if ocr == None:
+    if ocr is None:
         ocr = _g_defaultReadWithOCR
 
     if not source:
@@ -538,12 +540,10 @@ def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=N
 
         # take a screenshot
         import fmbtx11
-        fmbtx11.Screen().refreshScreenshot().save(SCREENSHOT_FILENAME + ".png")
-        _runcmd("%s %s.png -crop %sx%s+%s+%s +repage '%s'" %
-               (fmbt_config.imagemagick_convert, SCREENSHOT_FILENAME,
-                _g_windowSizes[_g_lastWindow][0], _g_windowSizes[_g_lastWindow][1],
-                _g_windowOffsets[_g_lastWindow][0], _g_windowOffsets[_g_lastWindow][1],
-                SCREENSHOT_FILENAME))
+        fmbtx11.Screen().refreshScreenshot().save(f"{SCREENSHOT_FILENAME}.png")
+        _runcmd(
+            f"{fmbt_config.imagemagick_convert} {SCREENSHOT_FILENAME}.png -crop {_g_windowSizes[_g_lastWindow][0]}x{_g_windowSizes[_g_lastWindow][1]}+{_g_windowOffsets[_g_lastWindow][0]}+{_g_windowOffsets[_g_lastWindow][1]} +repage '{SCREENSHOT_FILENAME}'"
+        )
         source = SCREENSHOT_FILENAME
     else:
         iUseImageAsWindow(source)
@@ -556,34 +556,30 @@ def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=N
         raise EyenfingerError("Invalid area size: %s => %s" % (ocrArea, (x1, y1, x2, y2)))
 
     if orig_width <= 0 or orig_height <= 0:
-        raise EyenfingerError("Invalid image size: %sx%s" % (orig_width, orig_height))
+        raise EyenfingerError(f"Invalid image size: {orig_width}x{orig_height}")
 
     if not ocr:
         if capture:
             drawWords(_g_origImage, capture, [], [])
         return []
 
-    if preprocess == None:
+    if preprocess is None:
         preprocess = _g_preprocess
 
     # convert to text
-    _g_readImage = _g_origImage + "-pp.png"
+    _g_readImage = f"{_g_origImage}-pp.png"
     if ocrArea == (0, 0, 1.0, 1.0):
         croparea = []
         wordXOffset = 0
         wordYOffset = 0
     else:
-        croparea = ["-crop", "%sx%s+%s+%s" % (x2-x1, y2-y1, x1, y1), "+repage"]
+        croparea = ["-crop", f"{x2 - x1}x{y2 - y1}+{x1}+{y1}", "+repage"]
         wordXOffset = x1
         wordYOffset = y1
-        # rescale possible resize preprocessing parameter
-        resize_m = re.search('-resize ([0-9]+)x([0-9]*)', preprocess)
-        if resize_m:
+        if resize_m := re.search('-resize ([0-9]+)x([0-9]*)', preprocess):
             origXResize = int(resize_m.group(1))
             newXResize = int(origXResize/float(orig_width) * (x2-x1))
-            preprocess = (preprocess[:resize_m.start()] +
-                          ("-resize %sx" % (newXResize,)) +
-                          preprocess[resize_m.end():])
+            preprocess = f"{preprocess[:resize_m.start()]}-resize {newXResize}x{preprocess[resize_m.end():]}"
     _g_words = {}
     for psm in ocrPageSegModes:
         convert_cmd = ([fmbt_config.imagemagick_convert, _g_origImage] +
@@ -594,12 +590,13 @@ def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=N
                          "-l", lang, _g_tesseractPSM, str(psm), "hocr"]
         if isinstance(configfile, basestring):
             tesseract_cmd += [configfile]
-        elif isinstance(configfile, list) or isinstance(configfile, tuple):
+        elif isinstance(configfile, (list, tuple)):
             tesseract_cmd += configfile
         exit_status, output = _runcmd(convert_cmd)
         if exit_status != 0:
-            raise NoOCRResults("Convert returned exit status (%s): %s"
-                               % (exit_status, _g_last_runcmd_error))
+            raise NoOCRResults(
+                f"Convert returned exit status ({exit_status}): {_g_last_runcmd_error}"
+            )
 
         exit_status, output = _runcmd(tesseract_cmd)
         if (exit_status == 1 and "'-psm'" in _g_last_runcmd_error
@@ -611,13 +608,14 @@ def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=N
             tesseract_cmd[tesseract_cmd.index("-psm")] = _g_tesseractPSM
             exit_status, output = _runcmd(tesseract_cmd)
         if exit_status != 0:
-            raise NoOCRResults("Tesseract returned exit status (%s): %s"
-                               % (exit_status, _g_last_runcmd_error))
+            raise NoOCRResults(
+                f"Tesseract returned exit status ({exit_status}): {_g_last_runcmd_error}"
+            )
 
-        hocr_filename = SCREENSHOT_FILENAME + ".html" # Tesseract 3.02
+        hocr_filename = f"{SCREENSHOT_FILENAME}.html"
 
         if not os.access(hocr_filename, os.R_OK):
-            hocr_filename = SCREENSHOT_FILENAME + ".hocr" # Tesseract 3.03
+            hocr_filename = f"{SCREENSHOT_FILENAME}.hocr"
             if not os.access(hocr_filename, os.R_OK):
                 raise NoOCRResults("HOCR output missing. Tesseract OCR 3.02 or greater required.\n")
 
@@ -628,7 +626,9 @@ def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=N
     try:
         ocr_page_line = [line for line in file(hocr_filename).readlines() if "class='ocr_page'" in line][0]
     except IndexError:
-        raise NoOCRResults("Could not read ocr_page class information from %s" % (hocr_filename,))
+        raise NoOCRResults(
+            f"Could not read ocr_page class information from {hocr_filename}"
+        )
 
     scaled_width, scaled_height = re.findall('bbox 0 0 ([0-9]+)\s*([0-9]+)', ocr_page_line)[0]
     scaled_width, scaled_height = float(scaled_width) / (float(x2-x1)/orig_width), float(scaled_height) / (float(y2-y1)/orig_height)
@@ -643,7 +643,7 @@ def iRead(windowId = None, source = None, preprocess = None, ocr=None, capture=N
                   int(bbox[1]/scaled_height * orig_height) + wordYOffset,
                   int(bbox[2]/scaled_width * orig_width) + wordXOffset,
                   int(bbox[3]/scaled_height * orig_height) + wordYOffset))
-            _log('found "' + word + '": (' + str(bbox[0]) + ', ' + str(bbox[1]) + ')')
+            _log(f'found "{word}": ({str(bbox[0])}, {str(bbox[1])})')
     if capture:
         drawWords(_g_origImage, capture, _g_words, _g_words)
     return sorted(_g_words.keys())
@@ -680,7 +680,7 @@ def iVerifyWord(word, match=0.33, appearance=1, capture=None):
     Throws NoOCRResults error if there are OCR results available
     on the current screen.
     """
-    if _g_words == None:
+    if _g_words is None:
         raise NoOCRResults('iRead has not been called with ocr=True')
 
     score, matching_word = findWord(word)
@@ -722,12 +722,12 @@ def iVerifyText(text, match=0.33, capture=None):
     Throws NoOCRResults error if there are OCR results available
     on the current screen.
     """
-    if _g_words == None:
+    if _g_words is None:
         raise NoOCRResults('iRead has not been called with ocr=True')
 
     score_text_bbox_list = findText(text, match)
     if len(score_text_bbox_list) == 0:
-        raise BadMatch('No match >= %s for text "%s"' % (score, text))
+        raise BadMatch(f'No match >= {score} for text "{text}"')
 
     score, text, bbox = score_text_box_list[0]
 

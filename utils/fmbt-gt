@@ -283,7 +283,7 @@ class Transition(object):
         self.action=str(action)
         self.dest=str(dest)
     def __str__(self):
-        return "Transition(%s,%s,%s)" % (self.source,self.action,self.dest)
+        return f"Transition({self.source},{self.action},{self.dest})"
 
 class Proposition(object):
     def __init__(self,state,proposition_name):
@@ -300,11 +300,11 @@ class LstsData(object):
     __slots__=['tr','pr','ac','pr_hash','tr_by_ss','pr_by_st','initial_state']
 
     def __str__(self):
-        return "LstsData(#tr=%s,#pr=%s)" % (len(self.tr),len(self.pr))
+        return f"LstsData(#tr={len(self.tr)},#pr={len(self.pr)})"
 
 class RuleElementList(list):
     def __str__(self):
-        return "[%s]" % ",".join([str(i) for i in self])
+        return f'[{",".join([str(i) for i in self])}]'
 
 class Rule(object):
     """
@@ -317,7 +317,7 @@ class Rule(object):
         self.apply_spec='once:'
 
     def __str__(self):
-        return "Rule: %s -> %s" % (self.lhs,self.rhs)
+        return f"Rule: {self.lhs} -> {self.rhs}"
 
 class TRRule(object):
     """
@@ -332,7 +332,7 @@ class TRRule(object):
         self.is_abstract=1
 
     def __str__(self):
-        return "%sT(%s,%s,%s)" % (self.neg,self.source,self.action,self.dest)
+        return f"{self.neg}T({self.source},{self.action},{self.dest})"
 
 class PRRule(object):
     """
@@ -346,7 +346,7 @@ class PRRule(object):
         self.is_abstract=1
 
     def __str__(self):
-        return "%sP(%s,%s)" % (self.neg,self.state,self.prop)
+        return f"{self.neg}P({self.state},{self.prop})"
 
 class ReqRule(object):
     """
@@ -357,7 +357,7 @@ class ReqRule(object):
         self.expression=expression
         self.is_abstract=0
     def __str__(self):
-        return "REQ[%s]" % self.expression
+        return f"REQ[{self.expression}]"
     def evaluate(self):
         try:
             t=eval(self.expression)
@@ -377,7 +377,7 @@ class QRule(object):
         self.setdef=setdef
         self.is_abstract=1
     def __str__(self):
-        return 'Q[%s in %s]' % (self.variable,self.setdef)
+        return f'Q[{self.variable} in {self.setdef}]'
 
 class PrintRule(object):
     """
@@ -389,7 +389,7 @@ class PrintRule(object):
         self.is_abstract=0
 
     def __str__(self):
-        return "OUT[%s]" % self.message
+        return f"OUT[{self.message}]"
 
     def output(self):
         print >>sys.stderr,self.message
@@ -536,47 +536,50 @@ def create_datastructures(l):
     pr_by_ss include quotation marks but attributes of Transition and
     Proposition objects do not.
     """
-    if l==None: # create new single-state lsts data structure
+    if l is None: # create new single-state lsts data structure
         l=LstsData()
         istatesymbol='0'
-        l.initial_state='"%s"' % istatesymbol
+        l.initial_state = f'"{istatesymbol}"'
         l.tr=[]
         l.ac=[]
         l.pr=[Proposition(istatesymbol,'gt:istate')]
         l.tr_by_ss={l.initial_state:[]}
-        l.pr_by_st={'"%s"'%istatesymbol:[l.pr[0]]}
-        l.pr_hash={'"%s"'%l.pr[0].prop:1}
+        l.pr_by_st = {f'"{istatesymbol}"': [l.pr[0]]}
+        l.pr_hash = {f'"{l.pr[0].prop}"': 1}
         return l
 
-    istatesymbol='%s'%int(l.get_header().initial_states)
-    initial_state='"%s"'%istatesymbol
+    istatesymbol = f'{int(l.get_header().initial_states)}'
+    initial_state = f'"{istatesymbol}"'
 
     tr=[] # list of Transitions
     pr=[Proposition(istatesymbol,'gt:istate')] # list of Propositions
     ac=[] # list of action names (strings)
 
     tr_by_ss = {}
-    pr_by_st = {'"%s"'%istatesymbol:[pr[0]]}
-    pr_hash = {'"%s"'%pr[0].prop:1}
+    pr_by_st = {f'"{istatesymbol}"': [pr[0]]}
+    pr_hash = {f'"{pr[0].prop}"': 1}
 
     actionnames=l.get_actionnames()
     for source,outtrans in enumerate(l.get_transitions()):
-        tr_by_ss['"%s"'%source]=[]
+        tr_by_ss[f'"{source}"'] = []
         for dest,action in outtrans:
             a=actionnames[action]
             t=Transition(source,a,dest)
             tr.append( t )
-            ss='"%s"'%source
+            ss = f'"{source}"'
             tr_by_ss[ss].append( t )
-            if not '"%s"'%a in ac: ac.append('"%s"'%a)
+            if f'"{a}"' not in ac:
+                ac.append(f'"{a}"')
 
     for propname in l.get_stateprops():
         for state in l.get_stateprops()[propname]:
             p=Proposition(state,propname)
             pr.append( p )
-            pr_hash['"%s"'%propname]=pr_hash.get('"%s"'%propname,0)+1
-            try: pr_by_st['"%s"'%state].append(p)
-            except KeyError: pr_by_st['"%s"'%state]=[p]
+            pr_hash[f'"{propname}"'] = pr_hash.get(f'"{propname}"', 0) + 1
+            try:
+                pr_by_st[f'"{state}"'].append(p)
+            except KeyError:
+                pr_by_st[f'"{state}"'] = [p]
 
     l=LstsData()
     l.tr=tr
@@ -596,13 +599,14 @@ def create_lsts(lstsdata, keep_actionnames=None, keep_propositionnames=()):
     """
     newlsts=lsts.writer()
 
-    if keep_actionnames != None:
-        if keep_actionnames == [] or keep_actionnames[0] != "tau":
-            actionnames = ["tau"] + keep_actionnames
-        else:
-            actionnames = keep_actionnames
-    else:
+    if keep_actionnames is None:
         actionnames = ["tau"]
+    else:
+        actionnames = (
+            ["tau"] + keep_actionnames
+            if keep_actionnames == [] or keep_actionnames[0] != "tau"
+            else keep_actionnames
+        )
     transitions=[[]]
     propositions=dict([(p,[]) for p in keep_propositionnames
                        if p != "gt:istate"])
@@ -623,13 +627,13 @@ def create_lsts(lstsdata, keep_actionnames=None, keep_propositionnames=()):
         ssnum=found_states[ss]
 
         for t in lstsdata.tr_by_ss[ss]:
-            if not t.action in actionnames:
+            if t.action not in actionnames:
                 actionnames.append(t.action)
             acnum=actionnames.index(t.action)
 
-            ds='"%s"'%t.dest
+            ds = f'"{t.dest}"'
 
-            if not ds in found_states:
+            if ds not in found_states:
                 found_states[ds]=len(found_states)
                 transitions.append([])
                 if ds in lstsdata.tr_by_ss:
@@ -645,9 +649,9 @@ def create_lsts(lstsdata, keep_actionnames=None, keep_propositionnames=()):
     for st in lstsdata.pr_by_st:
         for pr in lstsdata.pr_by_st[st]:
             if st in found_states:
-                if not pr.prop in ["gt:istate"]:
+                if pr.prop not in ["gt:istate"]:
                     # reserved state propositions are not written to the lsts
-                    if not pr.prop in propositions:
+                    if pr.prop not in propositions:
                         propositions[pr.prop]=[]
                     propositions[pr.prop].append(found_states[st])
 
@@ -660,7 +664,7 @@ def copy_of_rule(origrule,attribute,newvalue):
     is set to newvalue.
     """
     newrule=copy.copy(origrule)
-    setattr(newrule,attribute,'%s' % newvalue)
+    setattr(newrule, attribute, f'{newvalue}')
     return newrule
 
 def instantiate_trrule(lstsdata,r,which_hand_side,next_regex):
@@ -696,27 +700,25 @@ def instantiate_trrule(lstsdata,r,which_hand_side,next_regex):
                         retlist.append(copy_of_rule(r,position,ss))
                 elif position=='action':
                     for t in lstsdata.tr_by_ss[r.source]:
-                        retlist.append(copy_of_rule(r,position,
-                                                    '"%s"' % t.action))
-                        retdict[contents].append('"%s"' % t.action)
+                        retlist.append(copy_of_rule(r, position, f'"{t.action}"'))
+                        retdict[contents].append(f'"{t.action}"')
                 elif position=='dest':
                     for t in lstsdata.tr_by_ss[r.source]:
-                        if not r.action=='"%s"' % t.action: continue
-                        retlist.append(copy_of_rule(r,position,
-                                                    '"%s"' % t.dest))
-                        retdict[contents].append('"%s"' % t.dest)
+                        if r.action != f'"{t.action}"': continue
+                        retlist.append(copy_of_rule(r, position, f'"{t.dest}"'))
+                        retdict[contents].append(f'"{t.dest}"')
             elif which_hand_side=='right':
                 # New variables in places of states on the right-hand side
                 # mean creating a new state.
                 if position in ['source','dest']:
-                    newstate='"tr_state/%s"' % len(lstsdata.tr_by_ss)
+                    newstate = f'"tr_state/{len(lstsdata.tr_by_ss)}"'
                     lstsdata.tr_by_ss[newstate]=[]
                     retdict[contents]=[newstate]
                     retlist.append(copy_of_rule(r,position,newstate))
                 else:
-                    raise GTError("Cannot use free variable as the action " +
-                                  "name on the right hand side: %s" % r)
-        # Second, try if the position contains regular expressions
+                    raise GTError(
+                        f"Cannot use free variable as the action name on the right hand side: {r}"
+                    )
         elif re_regexps.search(contents):
             regex=convert_to_regexp(contents)
             if position=='source':
@@ -725,9 +727,9 @@ def instantiate_trrule(lstsdata,r,which_hand_side,next_regex):
                 ### elements=(s for s in lstsdata.tr_by_ss)
                 ### but for compatibility with python 2.3
                 ### I must use lists.
-                elements=[s for s in lstsdata.tr_by_ss]
+                elements = list(lstsdata.tr_by_ss)
             elif position=='action':
-                elements=['"%s"'%t.action for t in lstsdata.tr_by_ss[r.source]]
+                elements = [f'"{t.action}"' for t in lstsdata.tr_by_ss[r.source]]
             elif position=='dest':
                 elements=[t.dest for t in lstsdata.tr_by_ss[r.source]
                           if r.action==t.action]
@@ -741,46 +743,50 @@ def instantiate_trrule(lstsdata,r,which_hand_side,next_regex):
                         # for every ${} in the regexp create symbol
                         # $=n. and replace it by the contents of the
                         # group
-                        try: retdict["$=%s." % new_regexnum].append(g)
-                        except KeyError: retdict["$=%s." % new_regexnum]=[g]
+                        try:
+                            retdict[f"$={new_regexnum}."].append(g)
+                        except KeyError:
+                            retdict[f"$={new_regexnum}."] = [g]
                         new_regexnum+=1
             next_regex=new_regexnum
-        else: # no variable, no regexps, so it should be a matching value
-            pass
         return retdict,retlist,next_regex
+
     # end of function expand_position
 
     retdict={}
     retlist=[]
 
     rd,rl,next_regex=expand_tr_position('source',r,lstsdata,which_hand_side,next_regex)
-    if rd: return rd,rl,next_regex
-    else:
-        if which_hand_side=='left':
-            if not r.source in lstsdata.tr_by_ss:
-                # debugmsg("No matching source state for rule '%s'" % r)
-                # debugmsg("WAS: r.source=%s,%s" % (r.source,str(lstsdata.tr_by_ss.keys())))
-                return {},[],next_regex
-        # right-hand side can pass, when no symbol changes are required.
-        # every value will be matched...
-
+    if rd:
+        if rd: return rd,rl,next_regex
+    if which_hand_side=='left':
+        if r.source not in lstsdata.tr_by_ss:
+            # debugmsg("No matching source state for rule '%s'" % r)
+            # debugmsg("WAS: r.source=%s,%s" % (r.source,str(lstsdata.tr_by_ss.keys())))
+            return {},[],next_regex
     rd,rl,next_regex=expand_tr_position('action',r,lstsdata,which_hand_side,next_regex)
-    if rd: return rd,rl,next_regex
-    else:
-        if which_hand_side=='left':
-            if not [t for t in lstsdata.tr_by_ss[r.source]
-                    if r.action=='"%s"'%t.action ]:
-                # debugmsg("No matching action for rule '%s'" % r)
-                return {},[],next_regex
+    if rd:
+        if rd: return rd,rl,next_regex
+    if which_hand_side=='left':
+        if not [
+            t
+            for t in lstsdata.tr_by_ss[r.source]
+            if r.action == f'"{t.action}"'
+        ]:
+            # debugmsg("No matching action for rule '%s'" % r)
+            return {},[],next_regex
 
     rd,rl,next_regex=expand_tr_position('dest',r,lstsdata,which_hand_side,next_regex)
-    if rd: return rd,rl,next_regex
-    else:
-        if which_hand_side=='left':
-            if not [t for t in lstsdata.tr_by_ss[r.source]
-                    if (r.action=='"%s"'%t.action) and (r.dest=='"%s"'%t.dest) ]:
-                # debugmsg("No matching dest state for rule '%s'" % r)
-                return {},[],next_regex
+    if rd:
+        if rd: return rd,rl,next_regex
+    if which_hand_side=='left':
+        if not [
+            t
+            for t in lstsdata.tr_by_ss[r.source]
+            if r.action == f'"{t.action}"' and r.dest == f'"{t.dest}"'
+        ]:
+            # debugmsg("No matching dest state for rule '%s'" % r)
+            return {},[],next_regex
 
     # Now rule r specifies unambiguously a single transition
     return {},[r],next_regex
@@ -822,30 +828,29 @@ def instantiate_prrule(lstsdata,r,which_hand_side,next_regex):
                         retlist.append(copy_of_rule(r,position,st))
                 elif position=='prop':
                     for p in lstsdata.pr_by_st.get(r.state,[]):
-                        retlist.append(copy_of_rule(r,position,
-                                                    '"%s"' % p.prop))
-                        retdict[contents].append('"%s"' % p.prop)
+                        retlist.append(copy_of_rule(r, position, f'"{p.prop}"'))
+                        retdict[contents].append(f'"{p.prop}"')
             elif which_hand_side=='right':
                 # New variables in places of states on the right-hand side
                 # mean creating a new state.
                 if position == 'state':
-                    newstate='"pr_state/%s"' % len(lstsdata.tr_by_ss)
+                    newstate = f'"pr_state/{len(lstsdata.tr_by_ss)}"'
                     lstsdata.pr_by_st[newstate]=[] # this is a new proposition state
                     lstsdata.tr_by_ss[newstate]=[] # this is also a new state
                     retdict[contents]=[newstate]
                     retlist.append(copy_of_rule(r,position,newstate))
                 else:
-                    raise GTError("Cannot use free variable as proposition name "+
-                          "on the right hand side: %s" % contents)
-        # Second, try if the position contains regular expressions
+                    raise GTError(
+                        f"Cannot use free variable as proposition name on the right hand side: {contents}"
+                    )
         elif re_regexps.search(contents):
             regex=convert_to_regexp(contents)
             if position=='state':
                 ### * BAD THING *
                 ### see the previous bad thing.
-                elements=[s for s in lstsdata.tr_by_ss] # take all states
+                elements = list(lstsdata.tr_by_ss)
             elif position=='prop':
-                elements=['"%s"'%p.prop for p in lstsdata.pr_by_st.get(r.state,[])]
+                elements = [f'"{p.prop}"' for p in lstsdata.pr_by_st.get(r.state,[])]
             new_regexnum=next_regex
             for e in elements:
                 m=regex.match(e)
@@ -856,28 +861,32 @@ def instantiate_prrule(lstsdata,r,which_hand_side,next_regex):
                         # for every ${} in the regexp create symbol
                         # $=n. and replace it by the contents of the
                         # group
-                        try: retdict["$=%s." % new_regexnum].append(g)
-                        except KeyError: retdict["$=%s." % new_regexnum]=[g]
+                        try:
+                            retdict[f"$={new_regexnum}."].append(g)
+                        except KeyError:
+                            retdict[f"$={new_regexnum}."] = [g]
                         new_regexnum+=1
             next_regex=new_regexnum
         # no variable, no regexps, so it should be a matching value
         return retdict,retlist,next_regex
+
     # end of function expand_position
 
     rd,rl,next_regex=expand_pr_position('state',r,lstsdata,which_hand_side,next_regex)
-    if rd: return rd,rl,next_regex
-    else:
-        if which_hand_side=='left':
-            if not r.state in lstsdata.pr_by_st:
-                return {},[],next_regex
+    if rd:
+        if rd: return rd,rl,next_regex
+    if which_hand_side=='left':
+        if r.state not in lstsdata.pr_by_st:
+            return {},[],next_regex
 
     rd,rl,next_regex=expand_pr_position('prop',r,lstsdata,which_hand_side,next_regex)
-    if rd: return rd,rl,next_regex
-    else:
-        if which_hand_side=='left':
-            if not [p for p in lstsdata.pr_by_st[r.state]
-                    if r.prop=='"%s"'%p.prop ]:
-                return {},[],next_regex
+    if rd:
+        if rd: return rd,rl,next_regex
+    if which_hand_side=='left':
+        if not [
+            p for p in lstsdata.pr_by_st[r.state] if r.prop == f'"{p.prop}"'
+        ]:
+            return {},[],next_regex
 
     # Now rule r specifies unambiguously a single proposition
     return {},[r],next_regex
@@ -888,8 +897,9 @@ def instantiate_rule(lstsdata,absrule):
         replaced=0
         for str_attribute in element.string_slots:
             attrval=getattr(element,str_attribute)
-            if (symbol[:2]=="$=" or isinstance(element,PrintRule) or isinstance(element,ReqRule))\
-                   and symbol in attrval:
+            if (
+                symbol[:2] == "$=" or isinstance(element, (PrintRule, ReqRule))
+            ) and symbol in attrval:
                 # regexp replacement syms are replaced anywhere
                 setattr(element,str_attribute,
                         attrval.replace(symbol,replacement))
@@ -953,16 +963,14 @@ def instantiate_rule(lstsdata,absrule):
         absrule=abs_rules.pop()
         symchanges={}
 
-        elements=[e for e in absrule.lhs+absrule.rhs]
+        elements = list(absrule.lhs+absrule.rhs)
         element_index=0
         last_element=len(elements)-1
         first_right_element_index=len(absrule.lhs)
 
         while element_index <= last_element:
             element=elements[element_index]
-            if element_index<first_right_element_index: side='left'
-            else: side='right'
-
+            side = 'left' if element_index<first_right_element_index else 'right'
             instantiate=None
             if element.is_abstract:
                 if isinstance(element,TRRule):
@@ -996,7 +1004,7 @@ def instantiate_rule(lstsdata,absrule):
                     if isinstance(element,QRule):
                         # It seems that someone is quantifying over an empty
                         # set. Bad.
-                        raise GTError("Cannot quantify over an empty set. Rule: %s" % element)
+                        raise GTError(f"Cannot quantify over an empty set. Rule: {element}")
                     # we are dealing with a concrete element
                     if newelements and not element.neg:
                         # element matches and is not a negation,
@@ -1051,13 +1059,13 @@ def instantiate_rule(lstsdata,absrule):
                     break
         else: # did not break out from while => absrule is concrete
             # add concrete rule if it is unique
-            if not str(absrule) in concrete_rules_hash:
+            if str(absrule) not in concrete_rules_hash:
                 concrete_rules_hash[str(absrule)]=1
                 concrete_rules.append(absrule)
     if debugflag:
         msg_p1 = "concrete_rules:%s\t" % os.linesep
         msg_p2 = "%s\t" % os.linesep
-        debugmsg(msg_p1+(msg_p2.join(["%s"%r for r in concrete_rules])),1)
+        debugmsg(msg_p1 + msg_p2.join([f"{r}" for r in concrete_rules]), 1)
 
     return concrete_rules
 
@@ -1069,31 +1077,31 @@ def apply_rules(rules,lstsdata):
                 ss,ac,ds=remove_obj.source,remove_obj.action,remove_obj.dest
                 # Find and remove transition:
                 for t in lstsdata.tr_by_ss[ss]:
-                    if '"%s"'%t.action==ac and '"%s"'%t.dest==ds: break
+                    if f'"{t.action}"' == ac and f'"{t.dest}"' == ds: break
                 else: # for loop not breaked -> no transition found
                     continue
                 lstsdata.tr_by_ss[ss].remove(t)
             elif isinstance(remove_obj,PRRule):
                 # Find and remove proposition from a state:
                 for pr in lstsdata.pr_by_st[remove_obj.state]:
-                    if '"%s"'%pr.prop==remove_obj.prop:
+                    if f'"{pr.prop}"' == remove_obj.prop:
                         lstsdata.pr_by_st[remove_obj.state].remove(pr)
                         break
                 else: # for loop not breaked -> no proposition found.
-                    debugmsg("could not find proposition %s" % (remove_obj.prop,))
+                    debugmsg(f"could not find proposition {remove_obj.prop}")
                     continue
 
         for add_obj in r.rhs:
             if isinstance(add_obj,TRRule):
                 ss,ac,ds=add_obj.source,add_obj.action,add_obj.dest
                 # debugmsg("adding (%s,%s,%s)" % (ss,ac,ds))
-                if not ac in lstsdata.ac: lstsdata.ac.append(ac)
-                if not ss in lstsdata.tr_by_ss: lstsdata.tr_by_ss[ss]=[]
-                if not ds in lstsdata.tr_by_ss: lstsdata.tr_by_ss[ds]=[]
+                if ac not in lstsdata.ac: lstsdata.ac.append(ac)
+                if ss not in lstsdata.tr_by_ss: lstsdata.tr_by_ss[ss]=[]
+                if ds not in lstsdata.tr_by_ss: lstsdata.tr_by_ss[ds]=[]
                 lstsdata.tr_by_ss[ss].append(Transition(ss[1:-1],ac[1:-1],ds[1:-1]))
             elif isinstance(add_obj,PRRule):
                 st,pr=add_obj.state,add_obj.prop
-                if not st in lstsdata.tr_by_ss: lstsdata.tr_by_ss[st]=[]
+                if st not in lstsdata.tr_by_ss: lstsdata.tr_by_ss[st]=[]
                 lstsdata.pr_hash[pr]=lstsdata.pr_hash.get(pr,0)+1
                 try: lstsdata.pr_by_st[st].append(Proposition(st[1:-1],pr[1:-1]))
                 except KeyError: lstsdata.pr_by_st[st]=[Proposition(st[1:-1],pr[1:-1])]

@@ -81,27 +81,32 @@ class ConnectionProxy(Proxy):
 
     def __getattr__(self, attrname):
         try:
-            self._ps_conn.eval_in(self._ps_ns, "devices.acquired(%s).connection().%s" % (repr(self._id), attrname))
+            self._ps_conn.eval_in(
+                self._ps_ns,
+                f"devices.acquired({repr(self._id)}).connection().{attrname}",
+            )
         except pythonshare.RemoteEvalError as e:
             raise AttributeError(e)
 
     def __str__(self):
-        return "ConnectionProxy(%s)" % (repr(self._ps_conn),)
+        return f"ConnectionProxy({repr(self._ps_conn)})"
 
     def _forwardCall(self, methodName, *args, **kwargs):
-        arg_list = ([repr(a) for a in args] +
-                    ['%s=%s' % (k, repr(v)) for k, v in kwargs.items()])
+        arg_list = [repr(a) for a in args] + [
+            f'{k}={repr(v)}' for k, v in kwargs.items()
+        ]
         return self._remoteEval(
-            "devices.acquired(%s).connection().%s(%s)" % (
-            repr(self._id), methodName, ", ".join(arg_list)))
+            f'devices.acquired({repr(self._id)}).connection().{methodName}({", ".join(arg_list)})'
+        )
 
     def recvScreenshot(self, filename):
         remoteFilename = os.path.join("/tmp", os.path.basename(filename))
         if self._forwardCall("recvScreenshot", remoteFilename) != True:
             return False
         file(filename, "wb").write(
-            self._remoteEval('file("%s", "rb").read()' % (remoteFilename,)))
-        self._remoteEval('os.remove("%s")' % (remoteFilename,))
+            self._remoteEval(f'file("{remoteFilename}", "rb").read()')
+        )
+        self._remoteEval(f'os.remove("{remoteFilename}")')
         return True
 
 # Most methods are fine with a simple proxy
@@ -110,12 +115,20 @@ def _methodProxy(methodName):
             self._forwardCall(methodName, *args, **kwargs))
 
 for m in dir(fmbtandroid._AndroidDeviceConnection):
-    if getattr(ConnectionProxy, m, None) == None and (
-            m.startswith("send") or
-            m.startswith("recv") or
-            m.startswith("set") or
-            m in ["_runAdb", "reboot", "shellSOE",  "target", "settings",
-                  "screencapArgs"]):
+    if getattr(ConnectionProxy, m, None) is None and (
+        m.startswith("send")
+        or m.startswith("recv")
+        or m.startswith("set")
+        or m
+        in [
+            "_runAdb",
+            "reboot",
+            "shellSOE",
+            "target",
+            "settings",
+            "screencapArgs",
+        ]
+    ):
         setattr(ConnectionProxy, m, _methodProxy(m))
 
 class GenericProxy(Proxy):
@@ -124,8 +137,7 @@ class GenericProxy(Proxy):
         Proxy.__init__(self, id, pythonshareConnectionNamespace)
 
     def __str__(self):
-        return "GenericProxy(%s, %s)" % (
-            repr(self._id), repr((self._ps_conn, self._ps_ns)))
+        return f"GenericProxy({repr(self._id)}, {repr((self._ps_conn, self._ps_ns))})"
 
     def __dir__(self):
         return self._remoteEval(
@@ -135,11 +147,20 @@ class GenericProxy(Proxy):
 
     def _remoteCall(self, method, args, kwargs):
         return self._remoteEval(
-            "devices.acquired(%s).%s(%s)" % (
-                repr(self._id),
-                method,
-                ",".join([repr(a) for a in args] +
-                         ["%s=%s" % (k, repr(kwargs[k])) for k in kwargs])))
+            (
+                "devices.acquired(%s).%s(%s)"
+                % (
+                    repr(self._id),
+                    method,
+                    ",".join(
+                        (
+                            [repr(a) for a in args]
+                            + [f"{k}={repr(kwargs[k])}" for k in kwargs]
+                        )
+                    ),
+                )
+            )
+        )
 
     def __getattr__(self, attrname):
         return lambda *args, **kwargs: self._remoteCall(attrname, args, kwargs)
@@ -178,7 +199,7 @@ def acquire(pythonshareHostspec=None, block=True, acquirer=None,
     """
     serialNumber, ps_conn, ps_ns = _acquire(pythonshareHostspec, block,
                                             acquirer=acquirer, **matchRegexps)
-    if serialNumber == None:
+    if serialNumber is None:
         return None
     else:
         return GenericProxy(serialNumber, (ps_conn, ps_ns))
@@ -191,9 +212,7 @@ def release(proxy):
       proxy (GenericProxy instance):
               Proxy object returned by acquire().
     """
-    proxy._ps_conn.eval_in(
-        proxy._ps_ns,
-        "devices.release(%s)" % (repr(proxy._id),))
+    proxy._ps_conn.eval_in(proxy._ps_ns, f"devices.release({repr(proxy._id)})")
 
 def acquireDevice(pythonshareHostspec=None, block=True, acquirer=None,
                   **matchRegexps):
@@ -227,7 +246,7 @@ def acquireDevice(pythonshareHostspec=None, block=True, acquirer=None,
     serialNumber, ps_conn, ps_ns = _acquire(pythonshareHostspec, block,
                                             acquirer=acquirer, **matchRegexps)
     if serialNumber:
-        info = ps_conn.eval_in(ps_ns, "devices.info(%s)" % (repr(serialNumber),))
+        info = ps_conn.eval_in(ps_ns, f"devices.info({repr(serialNumber)})")
     else:
         return None
 
@@ -252,36 +271,41 @@ def releaseDevice(device):
     elif isinstance(device, GenericProxy):
         release(device)
     else:
-        raise ValueError('invalid object "%s"' % (device,))
+        raise ValueError(f'invalid object "{device}"')
 
 def acquireConnection(pythonshareHostspec=None, block=True, acquirer=None, **matchRegexps):
     serialNumber, ps_conn, ps_ns = _acquire(pythonshareHostspec, block,
                                             acquirer=acquirer, **matchRegexps)
-    if ps_conn == None:
+    if ps_conn is None:
         return None
     return ConnectionProxy(serialNumber, (ps_conn, ps_ns))
 
 def _acquire(pythonshareHostspec=None, block=True, acquirer=None, **matchRegexps):
-    if pythonshareHostspec == None:
+    if pythonshareHostspec is None:
         pythonshareHostspec = os.getenv("REMOTEDEVICES_SERVER", "localhost")
     ps_ns = "devices"
     try:
         ps_conn = pythonshare.connection(pythonshareHostspec)
     except socket.error as e:
-        raise ConnectionError('connecting to remotedevices server "%s" failed (%s)' % (pythonshareHostspec, e))
+        raise ConnectionError(
+            f'connecting to remotedevices server "{pythonshareHostspec}" failed ({e})'
+        )
     if matchRegexps:
-        matchCode = ", ".join(["%s=%s" % (r, repr(matchRegexps[r])) for r in matchRegexps])
+        matchCode = ", ".join([f"{r}={repr(matchRegexps[r])}" for r in matchRegexps])
     else:
         matchCode = ""
-    if acquirer == None:
+    if acquirer is None:
         acquirer = os.getenv("REMOTEDEVICES_ACQID", "")
-    serialNumber = ps_conn.eval_in(ps_ns, "devices.acquire(block=%s, acquirer=%s, %s)" % (block, repr(acquirer), matchCode), lock=False)
+    serialNumber = ps_conn.eval_in(
+        ps_ns,
+        f"devices.acquire(block={block}, acquirer={repr(acquirer)}, {matchCode})",
+        lock=False,
+    )
 
-    if serialNumber == None:
-        ps_conn.close()
-        return None, None, None
-    else:
+    if serialNumber is not None:
         return serialNumber, ps_conn, ps_ns
+    ps_conn.close()
+    return None, None, None
 
 def rescan(pythonshareHostspec=None):
     """Rescan devices on a remotedevices server.
@@ -294,21 +318,22 @@ def rescan(pythonshareHostspec=None):
               REMOTEDEVICES_SERVER will be used. If that is undefined,
               "localhost" will be used.
     """
-    if pythonshareHostspec == None:
+    if pythonshareHostspec is None:
         pythonshareHostspec = os.getenv("REMOTEDEVICES_SERVER", "localhost")
     ps_ns = "devices"
     try:
         ps_conn = pythonshare.connection(pythonshareHostspec)
     except socket.error as e:
-        raise ConnectionError('connecting to remotedevices server "%s" failed (%s)' % (pythonshareHostspec, e))
+        raise ConnectionError(
+            f'connecting to remotedevices server "{pythonshareHostspec}" failed ({e})'
+        )
     ps_conn.eval_in(ps_ns, "devices.rescan()")
 
 def releaseConnection(connection):
     ps_conn = connection._ps_conn
     ps_ns = connection._ps_ns
     serialNumber = connection._id
-    ps_conn.exec_in(ps_ns, "devices.release(%s)" % (
-        repr(serialNumber),), lock=False)
+    ps_conn.exec_in(ps_ns, f"devices.release({repr(serialNumber)})", lock=False)
 
 class ConnectionError(Exception):
     pass

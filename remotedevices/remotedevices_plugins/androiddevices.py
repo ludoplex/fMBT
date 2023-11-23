@@ -23,8 +23,7 @@ _serialNumberPrefix = ""
 
 class AndroidDevices(remotedevices_server.DeviceClass):
     def rescan(self):
-        return ["%s%s" % (_serialNumberPrefix, sn)
-                for sn in fmbtandroid.listSerialNumbers()]
+        return [f"{_serialNumberPrefix}{sn}" for sn in fmbtandroid.listSerialNumbers()]
 
     def adopt(self, deviceId):
         """return pair (DeviceObject, DeviceInfo)"""

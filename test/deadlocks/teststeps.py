@@ -14,11 +14,10 @@ def iModel(description):
     elif description == "outonly":
         model = 'T(istate, "oNop", dead)'
     elif description == "outonly-after-input":
-        model = 'T(istate, "iNop", ostate)'
-        model+= 'T(ostate, "oNop", dead)'
+        model = 'T(istate, "iNop", ostate)' + 'T(ostate, "oNop", dead)'
     else:
-        raise Exception("teststeps.py: don't know how to make model '%s'" % (description,))
-    modelcmd = "fmbt-gt -o model.lsts 'P(istate,p) -> %s'" % (model,)
+        raise Exception(f"teststeps.py: don't know how to make model '{description}'")
+    modelcmd = f"fmbt-gt -o model.lsts 'P(istate,p) -> {model}'"
     s,o = commands.getstatusoutput(modelcmd)
     if s != 0:
         raise Exception("teststeps.py: fmbt-gt error, try: \"%s\"" % (modelcmd,))
@@ -28,11 +27,9 @@ def iActions(i=0, o=0):
     """
     adds extra actions to model.lsts
     """
-    model = ''
-    for n in xrange(i):
-        model += 'T(unreachable, "iExtra%s", istate)' % (n,)
+    model = ''.join(f'T(unreachable, "iExtra{n}", istate)' for n in xrange(i))
     for n in xrange(o):
-        model += 'T(unreachable, "oExtra%s", istate)' % (n,)
+        model += f'T(unreachable, "oExtra{n}", istate)'
     modelcmd = "fmbt-gt -i model.lsts -o model.lsts --keep-labels 'P(istate, \"gt:istate\") -> %s'" % (model,)
     s,o = commands.getstatusoutput(modelcmd)
     if s != 0:
@@ -43,12 +40,12 @@ def iHeur(heuristics):
     define heuristics to be used in the test configuration
     """
     global testconf_contents
-    testconf_contents.append('heuristics = "%s"' % (heuristics,))
+    testconf_contents.append(f'heuristics = "{heuristics}"')
 
 def iEnd(end_condition):
-    if end_condition == None: return
+    if end_condition is None: return
     else:
-        testconf_contents.append('inconc = "%s"' % (end_condition,))
+        testconf_contents.append(f'inconc = "{end_condition}"')
 
 def iRun(expected_verdict):
     testconf_contents.append('on_fail = "exit:10"')

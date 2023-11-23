@@ -50,20 +50,21 @@ _g_wake_server_function = None
 _g_waker_lock = None
 
 def timestamp():
-    if on_windows:
-        rv = "%.6f" % (
-            (datetime.datetime.utcnow() -
-             datetime.datetime(1970, 1, 1)).total_seconds(),)
-    else:
-        rv = datetime.datetime.now().strftime("%s.%f")
-    return rv
+    return (
+        "%.6f"
+        % (
+            (
+                datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)
+            ).total_seconds(),
+        )
+        if on_windows
+        else datetime.datetime.now().strftime("%s.%f")
+    )
 
 def daemon_log(msg):
     if opt_debug_limit >= 0:
         if len(msg) > opt_debug_limit:
-            msg = (msg[:opt_debug_limit//2] +
-                   ("...[%s B, log CRC %s]..." % (len(msg), messages.crc(msg))) +
-                   msg[-opt_debug_limit//2:])
+            msg = f"{msg[:opt_debug_limit // 2]}...[{len(msg)} B, log CRC {messages.crc(msg)}]...{msg[-opt_debug_limit // 2:]}"
     formatted_msg = "%s %s\n" % (timestamp(), msg)
     if opt_log_fd != None:
         os.write(opt_log_fd, str.encode(formatted_msg))
@@ -130,10 +131,7 @@ class Pythonshare_ns(object):
     def exec_on_disconnect(self, code, any_connection=False):
         """Add code that will be executed when client has disconnected.
         """
-        if not any_connection:
-            conn_id = _g_executing_pythonshare_conn_id
-        else:
-            conn_id = None
+        conn_id = _g_executing_pythonshare_conn_id if not any_connection else None
         self._on_disconnect.append((conn_id, code))
 
     def exec_on_drop(self, code):
@@ -155,45 +153,45 @@ class Pythonshare_ns(object):
             if not setter_conn_id or setter_conn_id == conn_id:
                 exec_msg = messages.Exec(self.ns, code, None)
                 if opt_debug:
-                    daemon_log("on disconnect %s: %s" % (conn_id, exec_msg,))
+                    daemon_log(f"on disconnect {conn_id}: {exec_msg}")
                 rv = _local_execute(exec_msg)
                 if opt_debug:
-                    daemon_log("on disconnect rv: %s" % (rv,))
-                if setter_conn_id == conn_id:
-                    self._on_disconnect.remove((conn_id, code))
+                    daemon_log(f"on disconnect rv: {rv}")
+            if setter_conn_id == conn_id:
+                self._on_disconnect.remove((conn_id, code))
 
     def call_on_drop(self):
         for code in self._on_drop:
             exec_msg = messages.Exec(self.ns, code, None)
             if opt_debug:
-                daemon_log("on drop: %s" % (exec_msg,))
+                daemon_log(f"on drop: {exec_msg}")
             rv = _local_execute(exec_msg)
             if opt_debug:
-                daemon_log("on drop rv: %s" % (rv,))
+                daemon_log(f"on drop rv: {rv}")
 
     def read_rv(self, async_rv):
         """Return and remove asynchronous return value.
         """
         if self.ns != async_rv.ns:
             raise ValueError("Namespace mismatch")
-        if (async_rv.ns in _g_async_rvs and
-            async_rv.rvid in _g_async_rvs[async_rv.ns]):
-            rv = _g_async_rvs[async_rv.ns][async_rv.rvid]
-            if not isinstance(rv, python3share.InProgress):
-                del _g_async_rvs[async_rv.ns][async_rv.rvid]
-            return rv
-        else:
-            raise ValueError('Invalid return value id: "%s"'
-                             % (async_rv.rvid,))
+        if (
+            async_rv.ns not in _g_async_rvs
+            or async_rv.rvid not in _g_async_rvs[async_rv.ns]
+        ):
+            raise ValueError(f'Invalid return value id: "{async_rv.rvid}"')
+        rv = _g_async_rvs[async_rv.ns][async_rv.rvid]
+        if not isinstance(rv, python3share.InProgress):
+            del _g_async_rvs[async_rv.ns][async_rv.rvid]
+        return rv
 
     def poll_rvs(self):
         """Returns list of Async_rv instances that are ready for reading.
         """
-        rv = []
-        for rvid, value in _g_async_rvs[self.ns].items():
-            if not isinstance(value, python3share.InProgress):
-                rv.append(messages.Async_rv(self.ns, rvid))
-        return rv
+        return [
+            messages.Async_rv(self.ns, rvid)
+            for rvid, value in _g_async_rvs[self.ns].items()
+            if not isinstance(value, python3share.InProgress)
+        ]
 
 class Pythonshare_rns(object):
     """Remote namespace"""
@@ -225,9 +223,9 @@ _g_async_rv_counter = 0
 _g_server_shutdown = False
 
 def _init_local_namespace(ns, init_code=None, force=False):
-    if not ns in _g_local_namespaces:
+    if ns not in _g_local_namespaces:
         if opt_allow_new_namespaces or force:
-            daemon_log('added local namespace "%s"' % (ns,))
+            daemon_log(f'added local namespace "{ns}"')
             _g_local_namespaces[ns] = {
                 "pythonshare_ns": Pythonshare_ns(ns),
                 "Async_rv": python3share.messages.Async_rv
@@ -235,7 +233,7 @@ def _init_local_namespace(ns, init_code=None, force=False):
             _g_local_namespace_locks[ns] = _thread.allocate_lock()
             _g_async_rvs[ns] = {}
         else:
-            raise ValueError('Unknown namespace "%s"' % (ns,))
+            raise ValueError(f'Unknown namespace "{ns}"')
     if init_code != None:
         if isinstance(init_code, str):
             try:
@@ -253,7 +251,7 @@ def _init_local_namespace(ns, init_code=None, force=False):
             raise TypeError("unsupported init_code type")
 
 def _drop_local_namespace(ns):
-    daemon_log('drop local namespace "%s"' % (ns,))
+    daemon_log(f'drop local namespace "{ns}"')
     _g_local_namespaces[ns]["pythonshare_ns"].call_on_drop()
     del _g_local_namespaces[ns]
     del _g_local_namespace_locks[ns]
@@ -261,7 +259,7 @@ def _drop_local_namespace(ns):
     # send notification to all connections in _g_namespace_exports[ns]?
 
 def _drop_remote_namespace(ns):
-    daemon_log('drop remote namespace "%s"' % (ns,))
+    daemon_log(f'drop remote namespace "{ns}"')
     try:
         rns = _g_remote_namespaces[ns]
         del _g_remote_namespaces[ns]
@@ -272,26 +270,24 @@ def _drop_remote_namespace(ns):
 
 def _init_remote_namespace(ns, conn, to_remote, from_remote):
     if ns in _g_remote_namespaces:
-        raise ValueError('Remote namespace "%s" already registered' % (
-            ns,))
-    daemon_log('added remote namespace "%s", origin "%s"' % (
-        ns, conn.getpeername()))
+        raise ValueError(f'Remote namespace "{ns}" already registered')
+    daemon_log(f'added remote namespace "{ns}", origin "{conn.getpeername()}"')
     _g_remote_namespaces[ns] = Pythonshare_rns(conn, to_remote, from_remote)
 
 def _register_exported_namespace(ns, conn):
-    if not ns in _g_namespace_exports:
+    if ns not in _g_namespace_exports:
         _g_namespace_exports[ns] = []
     _g_namespace_exports[ns].append(conn)
 
 def _local_execute(exec_msg, conn_id=None):
     global _g_executing_pythonshare_conn_id
     ns = exec_msg.namespace
-    if not ns in _g_local_namespaces:
-        code_exc = expr_exc = "no local namespace %s" % (ns,)
+    if ns not in _g_local_namespaces:
+        code_exc = expr_exc = f"no local namespace {ns}"
         return messages.Exec_rv(code_exc, expr_exc, None)
     if conn_id:
-        if not conn_id in _g_namespace_users:
-            _g_namespace_users[conn_id] = set([ns])
+        if conn_id not in _g_namespace_users:
+            _g_namespace_users[conn_id] = {ns}
         else:
             _g_namespace_users[conn_id].add(ns)
     code_exc, expr_exc, expr_rv = None, None, None
@@ -316,7 +312,7 @@ def _local_execute(exec_msg, conn_id=None):
                 except _thread.error:
                     pass # already unlocked namespace
     else:
-        code_exc = expr_exc = 'locking namespace "%s" failed' % (ns,)
+        code_exc = expr_exc = f'locking namespace "{ns}" failed'
     if isinstance(expr_rv, python3share.messages.Exec_rv):
         return expr_rv
     else:

@@ -158,7 +158,7 @@ def run_client(port, from_fmbt, to_fmbt):
                 data = from_file.readline()
             except socket.error:
                 data = ""
-            if len(data) == 0:
+            if not data:
                 break
             try:
                 to_file.write(data)
@@ -181,12 +181,12 @@ def server_log(msg):
         log_msg = "%.3f session %s %s\n" % (
             time.time(), opt_session_id, msg)
 
-        if opt_log_filename != None:
-            file(opt_log_filename, "a+").write(log_msg)
+    if opt_log_filename != None:
+        file(opt_log_filename, "a+").write(log_msg)
 
-        if opt_debug:
-            sys.stdout.write(log_msg)
-            sys.stdout.flush()
+    if opt_debug:
+        sys.stdout.write(log_msg)
+        sys.stdout.flush()
 
 def recv_quoted_lines(f):
     """returns list of strings, None if failed"""
@@ -197,13 +197,10 @@ def recv_quoted_lines(f):
         number_of_lines = int(get_line(f).strip())
     except ValueError:
         return None
-    lines = []
-    for _ in xrange(number_of_lines):
-        lines.append(urllib.unquote(get_line(f).strip()))
-    return lines
+    return [urllib.unquote(get_line(f).strip()) for _ in xrange(number_of_lines)]
 
 def format_execution(action_number, tag_numbers):
-    return "(%s,%s)" % (action_number, " ".join([str(n) for n in tag_numbers]))
+    return f'({action_number},{" ".join([str(n) for n in tag_numbers])})'
 
 def parse_execution(reported_line):
     """
@@ -232,22 +229,22 @@ def valid_execution(client_id, parsed_execution):
     try:
         action_number, tag_numbers = parsed_execution
     except ValueError:
-        server_log("cannot split to action_number, tag_numbers: %s" %
-                   (parsed_execution,))
+        server_log(f"cannot split to action_number, tag_numbers: {parsed_execution}")
     if client_id in client_i2a and client_id in client_i2t:
         if action_number in client_i2a[client_id]:
             for tag_number in tag_numbers:
-                if not tag_number in client_i2t[client_id]:
-                    server_log("invalid tag %s in client %s execution %s" %
-                               (tag_number, client_id, parsed_execution))
+                if tag_number not in client_i2t[client_id]:
+                    server_log(
+                        f"invalid tag {tag_number} in client {client_id} execution {parsed_execution}"
+                    )
                     return False
             return True
         else:
-            server_log("invalid action %s in client %s execution %s" %
-                       (action_number, client_id, parsed_execution))
+            server_log(
+                f"invalid action {action_number} in client {client_id} execution {parsed_execution}"
+            )
     else:
-        server_log("invalid client %s in execution %s" %
-                   (client_id, parsed_execution))
+        server_log(f"invalid client {client_id} in execution {parsed_execution}")
     return False
 
 def queue_for_sharing(from_client, to_clients, parsed_execution):
@@ -261,7 +258,7 @@ def queue_for_sharing(from_client, to_clients, parsed_execution):
 
         to_client_action = convert_action(action_name, to_client)
         # not queueing for clients who don't know action_name
-        if to_client_action == None: continue
+        if to_client_action is None: continue
 
         # queue only tags known by to_client
         to_client_tags = []
@@ -271,7 +268,7 @@ def queue_for_sharing(from_client, to_clients, parsed_execution):
                 to_client_tags.append(to_client_tag)
 
         # make sure there is a send queue for actions from this client
-        if not from_client in client_unsent[to_client]:
+        if from_client not in client_unsent[to_client]:
             client_unsent[to_client][from_client] = []
 
         # queue for sending
@@ -290,7 +287,7 @@ def send_queued(unsent, to_file):
     for from_client in from_clients:
         if unsent[from_client]:
             send_clients.append(str(from_client))
-            send_executed.append("(%s)\n" % ",".join([f_e for f_e in unsent[from_client]]))
+            send_executed.append("(%s)\n" % ",".join(list(unsent[from_client])))
     try:
         to_file.write("(%s)\n" % (" ".join(send_clients),))
         to_file.write("".join(send_executed))
@@ -315,22 +312,20 @@ def serve_connection(conn):
         client_id = next_client_id
         next_client_id += 1
         clients.add(client_id)
-        server_log("new client %s" % (client_id,))
+        server_log(f"new client {client_id}")
 
     try:
         to_fmbt = conn.makefile("w")
         from_fmbt = conn.makefile("r")
 
         actions = recv_quoted_lines(from_fmbt)
-        server_log("client %s actions: %s" %
-                   (client_id, actions))
-        if actions == None:
+        server_log(f"client {client_id} actions: {actions}")
+        if actions is None:
             raise AssertionError("actions")
 
         tags = recv_quoted_lines(from_fmbt)
-        server_log("client %s tags: %s" %
-                   (client_id, tags))
-        if actions == None:
+        server_log(f"client {client_id} tags: {tags}")
+        if actions is None:
             raise AssertionError("tags")
 
         with client_lock:
@@ -371,7 +366,7 @@ def serve_connection(conn):
     except AssertionError:
         pass
     finally:
-        server_log("client %s left" % (client_id,))
+        server_log(f"client {client_id} left")
         close(to_fmbt, from_fmbt, conn)
 
         with client_lock:
@@ -389,11 +384,7 @@ def fork_server(port):
     if opt_overwrite_logfile and opt_log_filename:
         file(opt_log_filename, "w").close()
 
-    if opt_log_filename:
-        output_filename = opt_log_filename
-    else:
-        output_filename = "/dev/null"
-
+    output_filename = opt_log_filename if opt_log_filename else "/dev/null"
     if opt_debug == False and not on_windows:
         # The usual fork magic, cleaning up all connections to the parent process
         if os.fork() > 0:
@@ -416,7 +407,9 @@ def fork_server(port):
         os.dup2(_out.fileno(), sys.stdout.fileno())
         os.dup2(_err.fileno(), sys.stderr.fileno())
 
-    server_log("launching session %s server at port %s pid %s" % (opt_session_id, server_port, os.getpid()))
+    server_log(
+        f"launching session {opt_session_id} server at port {server_port} pid {os.getpid()}"
+    )
 
     # Start listening to the port
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -428,16 +421,13 @@ def fork_server(port):
     while not stop_server:
         conn, _ = s.accept()
         if opt_debug:
-            server_log("connection from %s" % (conn.getpeername(),))
+            server_log(f"connection from {conn.getpeername()}")
         if not stop_server:
             thread.start_new_thread(serve_connection, (conn,))
     time.sleep(0.5)
 
 def kill_server(server_port):
-    if send_server_control_command("quit"):
-        return True
-    else:
-        return False
+    return bool(send_server_control_command("quit"))
 
 def error(msg):
     sys.stderr.write("%s\n" % (msg,))

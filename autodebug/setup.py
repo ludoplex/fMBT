@@ -15,12 +15,12 @@ try:
 except:
     timestamp = "zzz"
 
-setup(name         = 'autodebug',
-      version      = '0.%s.g%s' % (timestamp, git_hash),
-      description  = 'gdb-based verbose backtrace printer',
-      author       = 'Antti Kervinen',
-      author_email = 'antti.kervinen@intel.com',
-      packages     = [],
-      scripts      = [f for f in glob.glob("bin/*")
-                      if not f.endswith("~")]
+setup(
+    name='autodebug',
+    version=f'0.{timestamp}.g{git_hash}',
+    description='gdb-based verbose backtrace printer',
+    author='Antti Kervinen',
+    author_email='antti.kervinen@intel.com',
+    packages=[],
+    scripts=[f for f in glob.glob("bin/*") if not f.endswith("~")],
 )

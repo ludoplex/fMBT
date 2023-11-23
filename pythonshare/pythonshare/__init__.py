@@ -126,7 +126,7 @@ def _send_opt(msg, destination, recv_caps, acquire_send_lock=True):
                 # only first bytes were compressed in trial, compress all now
                 data = zlib.compress(data, _SEND_OPT_COMPRESSION_LEVEL)
             data_length = len(data)
-            compression_info = "compressed(%s)" % (_uncompressed_data_length,)
+            compression_info = f"compressed({_uncompressed_data_length})"
         else:
             compression_info = "no_compression"
     else:
@@ -134,7 +134,8 @@ def _send_opt(msg, destination, recv_caps, acquire_send_lock=True):
     data_info = messages.Data_info(
         data_type="Exec_rv",
         data_length=data_length,
-        data_format=compression_info + ",pickled,allinone")
+        data_format=f"{compression_info},pickled,allinone",
+    )
     if acquire_send_lock:
         _acquire_send_lock(destination)
     try:
@@ -223,17 +224,16 @@ def _forward(source, destination, data_length,
             forward_block = source.read(
                 min(forward_block_size, data_length - bytes_read))
             bytes_read += len(forward_block)
-            if forward_block:
-                if destination_ok:
-                    try:
-                        destination.write(forward_block)
-                        destination.flush()
-                        bytes_sent += len(forward_block)
-                    except socket.error:
-                        destination_ok = False
-                        # must still keep reading everything from the source
-            else:
+            if not forward_block:
                 raise EOFError() # source run out of data
+            if destination_ok:
+                try:
+                    destination.write(forward_block)
+                    destination.flush()
+                    bytes_sent += len(forward_block)
+                except socket.error:
+                    destination_ok = False
+                    # must still keep reading everything from the source
         return bytes_sent
     finally:
         if acquire_recv_lock:
@@ -242,12 +242,12 @@ def _forward(source, destination, data_length,
             _release_send_lock(destination)
 
 def _acquire_recv_lock(source):
-    if not source in _recv.locks:
+    if source not in _recv.locks:
         _recv.locks[source] = thread.allocate_lock()
     _recv.locks[source].acquire()
 
 def _acquire_send_lock(destination):
-    if not destination in _send.locks:
+    if destination not in _send.locks:
         _send.locks[destination] = thread.allocate_lock()
     _send.locks[destination].acquire()
 
@@ -319,8 +319,8 @@ def connect(hostspec, password=None, namespace=None):
     """
     if hostspec in _PYTHONSHARE_HOSTSPECS:
         hostspec = _PYTHONSHARE_HOSTSPECS[hostspec]
-    if not "://" in hostspec:
-        hostspec = "socket://" + hostspec
+    if "://" not in hostspec:
+        hostspec = f"socket://{hostspec}"
     scheme, netloc, path, _, _ = _urlparse.urlsplit(hostspec)
 
     kwargs = {}
@@ -329,10 +329,7 @@ def connect(hostspec, password=None, namespace=None):
 
     if scheme == "socket":
         # Parse URL
-        if "@" in netloc:
-            userinfo, hostport = netloc.split("@", 1)
-        else:
-            userinfo, hostport = "", netloc
+        userinfo, hostport = netloc.split("@", 1) if "@" in netloc else ("", netloc)
         if ":" in userinfo:
             userinfo_user, userinfo_password = userinfo.split(":", 1)
         else:
@@ -346,13 +343,9 @@ def connect(hostspec, password=None, namespace=None):
         # Allow forms
         # socket://password@host:port
         # socket://dontcare:password@host:port
-        if password == None and userinfo:
-            if userinfo_password:
-                password = userinfo_password
-            else:
-                password = userinfo
-
-        if not "namespace" in kwargs and path.replace("/", "", 1):
+        if password is None and userinfo:
+            password = userinfo_password if userinfo_password else userinfo
+        if "namespace" not in kwargs and path.replace("/", "", 1):
             kwargs["namespace"] = path.replace("/", "", 1)
 
         rv = client.Connection(host, int(port), password=password, **kwargs)
@@ -367,7 +360,7 @@ def connect(hostspec, password=None, namespace=None):
             msvcrt.setmode(p.stdout.fileno(), os.O_BINARY)
         rv = client.Connection(p.stdout, p.stdin, **kwargs)
     else:
-        raise ValueError('invalid URI "%s"' % (hostspec,))
+        raise ValueError(f'invalid URI "{hostspec}"')
     rv.hostspec = hostspec
     return rv
 

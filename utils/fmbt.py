@@ -57,7 +57,7 @@ def _fmbt_call_helper(func,param = ""):
     return ""
 
 def formatTime(timeformat="%s", timestamp=None):
-    if timestamp == None:
+    if timestamp is None:
         timestamp = datetime.datetime.now()
     # strftime on Windows does not support conversion to epoch (%s).
     # Calculate it here, if needed.
@@ -198,23 +198,22 @@ def funcSpec(func):
     based on function object.
     """
     argspec = inspect.getargspec(func)
-    if argspec.defaults:
-        kwarg_count = len(argspec.defaults)
-    else:
-        kwarg_count = 0
+    kwarg_count = len(argspec.defaults) if argspec.defaults else 0
     arg_count = len(argspec.args) - kwarg_count
     arglist = [str(arg) for arg in argspec.args[:arg_count]]
     kwargs = argspec.args[arg_count:]
-    for index, kwarg in enumerate(kwargs):
-        arglist.append("%s=%s" % (kwarg, repr(argspec.defaults[index])))
+    arglist.extend(
+        f"{kwarg}={repr(argspec.defaults[index])}"
+        for index, kwarg in enumerate(kwargs)
+    )
     if argspec.varargs:
-        arglist.append("*%s" % (argspec.varargs,))
+        arglist.append(f"*{argspec.varargs}")
     if argspec.keywords:
-        arglist.append("**%s" % (argspec.keywords,))
+        arglist.append(f"**{argspec.keywords}")
     try:
-        funcspec = "%s(%s)" % (func.func_name, ", ".join(arglist))
+        funcspec = f'{func.func_name}({", ".join(arglist)})'
     except:
-        funcspec = "%s(fmbt.funcSpec error)" % (func.func_name,)
+        funcspec = f"{func.func_name}(fmbt.funcSpec error)"
     return funcspec
 
 ### Self-contained code: debug()
@@ -286,19 +285,16 @@ def debug(spec=None, post_mortem=False):
                     _g_debug_socket = None
                     _g_debug_conn = None
                     raise ValueError(
-                        'unexpected answer "%s", fmbt-debug expected' %
-                        (whos_there.strip(),))
+                        f'unexpected answer "{whos_there.strip()}", fmbt-debug expected'
+                    )
                 _g_debug_conn.sendall("fmbt.debug\n")
             except socket.error:
-                raise ValueError('debugger cannot connect to %s:%s' % (host, port))
+                raise ValueError(f'debugger cannot connect to {host}:{port}')
 
         if not _g_debug_socket:
             PORTBASE = 0xf4bd # 62653, fMBD
             host = "127.0.0.1" # accept local host only, by default
-            if spec is None:
-                session = 0
-            else:
-                session = spec
+            session = 0 if spec is None else spec
             port = PORTBASE + session
             _g_debug_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -327,15 +323,13 @@ def debug(spec=None, post_mortem=False):
                         _g_debug_socket = None
                         _g_debug_conn = None
                         raise ValueError(
-                            'unexpected answer "%s", fmbt-debug expected' %
-                            (whos_there.strip(),))
+                            f'unexpected answer "{whos_there.strip()}", fmbt-debug expected'
+                        )
                     _g_debug_conn.sendall("fmbt.debug\n")
                 except socket.error:
-                    raise ValueError('debugger cannot listen or connect to %s:%s' % (host, port))
+                    raise ValueError(f'debugger cannot listen or connect to {host}:{port}')
         return _g_debug_conn
 
-    # socket.makefile does not work due to buffering issues.
-    # Therefore, use our own socket-to-file converter
     class SocketToFile(object):
         def __init__(self, socket_conn):
             self._conn = socket_conn

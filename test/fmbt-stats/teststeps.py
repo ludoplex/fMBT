@@ -34,28 +34,23 @@ def iExecute():
         raise Exception("Seeded error")
 
     stepslogfile = file("teststeps.log","w")
-    cmd = "fmbt-stats %s %s %s %s %s" % (
-        fmbt_stats_format,
-        fmbt_stats_output,
-        fmbt_stats_plot,
-        fmbt_stats_logfile,
-        fmbt_stats_redirect)
-    fmbtlog("Running '%s'" % (cmd,))
+    cmd = f"fmbt-stats {fmbt_stats_format} {fmbt_stats_output} {fmbt_stats_plot} {fmbt_stats_logfile} {fmbt_stats_redirect}"
+    fmbtlog(f"Running '{cmd}'")
     p = subprocess.Popen(cmd, shell=True,
                          stdin  = subprocess.PIPE,
                          stdout = stepslogfile.fileno(),
                          stderr = stepslogfile.fileno())
     p.stdin.close()
     exit_status = p.wait()
-    adapterlog("'%s' exit status: %s" % (cmd, exit_status))
+    adapterlog(f"'{cmd}' exit status: {exit_status}")
 
     # Check exit status
     if fmbt_stats_logfile.endswith("-0.log"):
         if exit_status != 1:
-            raise Exception("exit status != 1 with empty log. Try: " + cmd)
+            raise Exception(f"exit status != 1 with empty log. Try: {cmd}")
         return None # no further checks for an empty log
     elif exit_status != 0:
-        raise Exception("exit status != 0 with non-empty log. Try: " + cmd)
+        raise Exception(f"exit status != 0 with non-empty log. Try: {cmd}")
 
     # Read produced statistics text file
     if fmbt_stats_output.startswith("-o"):
@@ -65,36 +60,38 @@ def iExecute():
         stats_text = file("stats-output-text.txt").read()
         stats_text_format = "txt"
     if stats_text.strip() == "":
-        raise Exception("empty output file. Try: " + cmd)
+        raise Exception(f"empty output file. Try: {cmd}")
 
     # Check that every step seems to be reported
     expected_step_count = int(fmbt_stats_logfile[len("stats-input-"):-len(".log")])
     if fmbt_stats_format.startswith("-f times") or fmbt_stats_format == "":
         # Times stats: sum up numbers in the total column
         if stats_text_format == "txt":
-            step_count = sum([int(row[39:49])
-                              for row in stats_text.split('\n')[2:]
-                              if row])
+            step_count = sum(
+                int(row[39:49]) for row in stats_text.split('\n')[2:] if row
+            )
         elif stats_text_format == "csv":
-            step_count = sum([int(row.split(';')[4])
-                              for row in stats_text.split('\n')[2:]
-                              if row])
+            step_count = sum(
+                int(row.split(';')[4])
+                for row in stats_text.split('\n')[2:]
+                if row
+            )
         elif stats_text_format == "html":
-            step_count = sum([int(row.split('</td><td>')[4])
-                             for row in stats_text.split('\n')[3:-2]
-                             if row])
+            step_count = sum(
+                int(row.split('</td><td>')[4])
+                for row in stats_text.split('\n')[3:-2]
+                if row
+            )
         else:
-            raise Exception("unknown times output format: %s" % (stats_text_format,))
+            raise Exception(f"unknown times output format: {stats_text_format}")
     elif fmbt_stats_format.startswith("-f speed"):
         # Speed stats: count rows
-        if stats_text_format == "txt":
-            step_count = stats_text.count('\n')-2
-        elif stats_text_format == "csv":
+        if stats_text_format in ["txt", "csv"]:
             step_count = stats_text.count('\n')-2
         elif stats_text_format == "html":
             step_count = stats_text.count('\n')-5
         else:
-            raise Exception("unknown speed output format: %s" % (stats_text_format,))        
+            raise Exception(f"unknown speed output format: {stats_text_format}")
     elif fmbt_stats_format.startswith("-f dist"):
         # Distribution stats: sum up numbers in the matrix. Needs
         # adding one because there's no previous action for the first
@@ -103,22 +100,38 @@ def iExecute():
         if "uniq" in fmbt_stats_format:
             step_count = expected_step_count # skip the test
         elif stats_text_format == "txt":
-            step_count = sum([sum([int(c) for c in row.split('"')[0].split()])
-                              for row in stats_text.split('\n')[2:]
-                              if row]) + 1
+            step_count = (
+                sum(
+                    sum(int(c) for c in row.split('"')[0].split())
+                    for row in stats_text.split('\n')[2:]
+                    if row
+                )
+                + 1
+            )
         elif stats_text_format == "csv":
-            step_count = sum([sum([int(c) for c in row.split(';')[:-1]])
-                              for row in stats_text.split('\n')[2:]
-                              if row]) + 1
+            step_count = (
+                sum(
+                    sum(int(c) for c in row.split(';')[:-1])
+                    for row in stats_text.split('\n')[2:]
+                    if row
+                )
+                + 1
+            )
         elif stats_text_format == "html":
-            step_count = sum([sum([int(c) for c in row[8:].split('</td><td>')[:-1]])
-                              for row in stats_text.split('\n')[4:]
-                              if row]) + 1
+            step_count = (
+                sum(
+                    sum(int(c) for c in row[8:].split('</td><td>')[:-1])
+                    for row in stats_text.split('\n')[4:]
+                    if row
+                )
+                + 1
+            )
         else:
-            raise Exception("unknown dist output format: %s" % (stats_text_format,))
+            raise Exception(f"unknown dist output format: {stats_text_format}")
     if step_count != expected_step_count:
-        raise Exception('text output reports %s steps (expected: %s). Try: %s'
-                            % (step_count, expected_step_count, cmd))
+        raise Exception(
+            f'text output reports {step_count} steps (expected: {expected_step_count}). Try: {cmd}'
+        )
 
     # Check that a non-empty plot file has been created if requested.
     if fmbt_stats_plot.startswith("-p"):
@@ -126,8 +139,8 @@ def iExecute():
             plot_filename = fmbt_stats_plot.split(",")[0][3:]
         else:
             plot_filename = fmbt_stats_plot[3:]
-        if not os.stat(plot_filename).st_size > 0:
-            raise Exception("zero-length plot file. Try: %s" % (cmd,))
+        if os.stat(plot_filename).st_size <= 0:
+            raise Exception(f"zero-length plot file. Try: {cmd}")
 
 
 def iSeedErrors(log=0, format=0, output=0, plot=0, randomSeed=0):
@@ -198,28 +211,28 @@ def iSeedErrors(log=0, format=0, output=0, plot=0, randomSeed=0):
 
 def iLogSteps(x):
     global fmbt_stats_logfile
-    fmbt_stats_logfile = "stats-input-%s.log" % (x,)
+    fmbt_stats_logfile = f"stats-input-{x}.log"
 
 def iFormatTimes(args):
     global fmbt_stats_format
-    if args == None:
+    if args is None:
         fmbt_stats_format = ""
     else:
         fmbt_stats_format = "-f times"
         if args:
-            fmbt_stats_format += ":" + args
+            fmbt_stats_format += f":{args}"
 
 def iFormatSpeed(args):
     global fmbt_stats_format
     fmbt_stats_format = "-f speed"
     if args:
-        fmbt_stats_format += ":" + args
+        fmbt_stats_format += f":{args}"
 
 def iFormatDist(args):
     global fmbt_stats_format
     fmbt_stats_format = "-f dist"
     if args:
-        fmbt_stats_format += ":" + args
+        fmbt_stats_format += f":{args}"
 
 def iOutput(arg):
     global fmbt_stats_output
@@ -228,12 +241,9 @@ def iOutput(arg):
         fmbt_stats_output = ""
         fmbt_stats_redirect = "> stats-output-text.txt"
     else:
-        fmbt_stats_output = "-o stats-output-text.%s" % (arg,)
+        fmbt_stats_output = f"-o stats-output-text.{arg}"
         fmbt_stats_redirect = ""
 
 def iPlot(arg):
     global fmbt_stats_plot
-    if arg == "":
-        fmbt_stats_plot = ""
-    else:
-        fmbt_stats_plot = "-p stats-output-plot.%s" % (arg,)
+    fmbt_stats_plot = "" if arg == "" else f"-p stats-output-plot.{arg}"
